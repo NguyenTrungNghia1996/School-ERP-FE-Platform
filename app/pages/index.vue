@@ -1,81 +1,97 @@
 <template>
-  <div class="mx-auto max-w-3xl p-6 space-y-6">
-    <a-card title="Kiểm tra trạng thái hệ thống (GET /api/health)">
-      <div class="space-y-4">
+  <div class="min-h-screen bg-slate-50 text-slate-800">
+    <!-- Public Header -->
+    <header class="border-b border-slate-200/80 bg-white">
+      <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <div class="flex items-center gap-3">
-          <span class="font-medium">Trạng thái SSR (useFetch):</span>
-          <a-tag v-if="loading" color="processing">Đang kiểm tra...</a-tag>
-          <a-tag v-else-if="healthError" color="error">Lỗi kết nối</a-tag>
-          <a-tag v-else color="success">
-            {{ healthData?.status || "ok" }}
-          </a-tag>
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-700 to-emerald-500 text-white shadow-xs">
+            <AppstoreOutlined class="text-xl" />
+          </div>
+          <div>
+            <div class="text-sm font-bold tracking-tight text-slate-800">SCHOOL ERP PLATFORM</div>
+            <div class="text-[11px] text-slate-400">Nền tảng Quản trị &amp; Điều hành Trường học Số</div>
+          </div>
         </div>
 
-        <div v-if="healthResponse" class="rounded bg-slate-100 p-3 text-sm">
-          <pre class="m-0 overflow-auto">{{ healthResponse }}</pre>
-        </div>
-
-        <a-space>
-          <a-button :loading="loading" @click="() => checkHealth()">
-            Làm mới SSR (refresh)
-          </a-button>
-          <a-button type="primary" :loading="isChecking" @click="handleCheckHealth">
-            Kiểm tra trạng thái (Health Check)
-          </a-button>
-        </a-space>
+        <ASpace>
+          <AButton v-if="isAuthenticated" type="primary" @click="navigateTo('/dashboard')">
+            Vào Dashboard
+          </AButton>
+          <AButton v-else type="primary" @click="navigateTo('/login')">
+            Đăng nhập hệ thống
+          </AButton>
+        </ASpace>
       </div>
-    </a-card>
+    </header>
+
+    <!-- Hero Section -->
+    <main class="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+      <div class="mx-auto max-w-3xl text-center">
+        <ATag color="blue" class="mb-4">Nền tảng SaaS Giáo dục Đa trường</ATag>
+        <ATypographyTitle :level="1" class="!mb-4 !text-3xl sm:!text-4xl">
+          Quản trị Hệ thống School ERP Tập trung &amp; Linh hoạt
+        </ATypographyTitle>
+        <ATypographyParagraph type="secondary" class="!mb-8 text-base">
+          Giải pháp quản lý toàn diện tổ chức, phân quyền người dùng, gói dịch vụ và vận hành hệ thống trường học số trên một nền tảng duy nhất.
+        </ATypographyParagraph>
+
+        <ASpace size="middle" wrap>
+          <AButton type="primary" size="large" @click="navigateTo(isAuthenticated ? '/dashboard' : '/login')">
+            {{ isAuthenticated ? "Đi tới Dashboard" : "Đăng nhập ngay" }}
+          </AButton>
+        </ASpace>
+      </div>
+
+      <!-- Feature Highlights -->
+      <ARow :gutter="[20, 20]" class="mt-14">
+        <ACol :xs="24" :md="8">
+          <ACard class="h-full !rounded-2xl !border-slate-200/80 shadow-xs">
+            <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <ApartmentOutlined class="text-xl" />
+            </div>
+            <ATypographyTitle :level="5">Quản lý Tổ chức &amp; Tenant</ATypographyTitle>
+            <ATypographyText type="secondary" class="text-sm">
+              Khởi tạo trường học, quản lý subdomain và phân bổ tài nguyên linh hoạt theo từng đơn vị.
+            </ATypographyText>
+          </ACard>
+        </ACol>
+
+        <ACol :xs="24" :md="8">
+          <ACard class="h-full !rounded-2xl !border-slate-200/80 shadow-xs">
+            <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+              <SafetyCertificateOutlined class="text-xl" />
+            </div>
+            <ATypographyTitle :level="5">Phân quyền &amp; Bảo mật RBAC</ATypographyTitle>
+            <ATypographyText type="secondary" class="text-sm">
+              Kiểm soát truy cập chi tiết theo vai trò, danh mục quyền và cây menu động từ máy chủ.
+            </ATypographyText>
+          </ACard>
+        </ACol>
+
+        <ACol :xs="24" :md="8">
+          <ACard class="h-full !rounded-2xl !border-slate-200/80 shadow-xs">
+            <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+              <CreditCardOutlined class="text-xl" />
+            </div>
+            <ATypographyTitle :level="5">Gói dịch vụ &amp; Vận hành</ATypographyTitle>
+            <ATypographyText type="secondary" class="text-sm">
+              Theo dõi gói cước, nhật ký kiểm toán (Audit Logs) và hỗ trợ kỹ thuật an toàn.
+            </ATypographyText>
+          </ACard>
+        </ACol>
+      </ARow>
+    </main>
   </div>
 </template>
 
-<script setup>
-import { message } from "antdv-next";
-import { useApi } from "~/composables/useApi";
-import { useApiError } from "~/composables/useApiError";
-
-const { health: healthApi } = useApi();
-const { handleApiError, extractApiData } = useApiError();
-
-// Cách 1: Gọi tải dữ liệu khi trang khởi tạo (Top-level SSR / useFetch)
-const {
-  data: healthResponse,
-  pending: loading,
-  refresh: checkHealth,
-  error: healthError,
-} = await healthApi.get({
-  key: "system-health-check",
+<script setup lang="ts">
+definePageMeta({
+  layout: false,
 });
 
-const healthData = computed(() => extractApiData(healthResponse));
+useHead({
+  title: "Giới thiệu | School ERP Platform",
+});
 
-watch(
-  () => unref(healthError),
-  (err) => {
-    if (err) {
-      handleApiError(null, err, "Không thể kết nối đến máy chủ!");
-    }
-  },
-);
-
-// Cách 2: Gọi theo hành động người dùng (Click Button / Client Event)
-const isChecking = ref(false);
-
-const handleCheckHealth = async () => {
-  isChecking.value = true;
-  try {
-    const { data: resData, error: apiErr } = await healthApi.getClient();
-
-    if (handleApiError(resData, apiErr, "Kiểm tra hệ thống thất bại!")) {
-      return;
-    }
-
-    const payload = extractApiData(resData);
-    message.success(unref(resData)?.message || payload?.message || "Hệ thống hoạt động bình thường!");
-  } catch (err) {
-    console.error("Lỗi kiểm tra health:", err);
-    message.error("Đã xảy ra lỗi mạng!");
-  } finally {
-    isChecking.value = false;
-  }
-};
+const { isAuthenticated } = useAuth();
 </script>
