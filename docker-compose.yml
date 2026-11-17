@@ -1,14 +1,10 @@
 services:
   school-erp-fe-platform:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        NUXT_PUBLIC_BASE_URL: https://api.nghia196.qzz.io/api
+    image: trungnghia1996/school-erp-fe-platform:latest
     container_name: school-erp-fe-platform
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "3000:3000"
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0

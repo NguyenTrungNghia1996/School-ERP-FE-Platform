@@ -111,7 +111,7 @@
     </ACard>
 
     <!-- Drawer Chi tiết Audit Log -->
-    <ADrawer v-model:open="drawerOpen" title="Chi tiết Nhật ký Kiểm toán" :width="680">
+    <ADrawer v-model:open="drawerOpen" title="Chi tiết Nhật ký Kiểm toán" :size="680">
       <div v-if="selectedLog" class="space-y-4">
         <ADescriptions bordered size="small" :column="1" :items="detailItems" />
 

@@ -131,10 +131,15 @@ export const useRequest = () => {
   /**
    * Client / event-driven $fetch request returning { data, error } refs
    * Chủ động refresh nếu access_token hết hạn, và retry 1 lần khi gặp 401.
+   * @param {string} url
+   * @param {Record<string, any>} [options]
+   * @returns {Promise<{ data: import("vue").Ref<Record<string, any> | null>, error: import("vue").Ref<any> }>}
    */
   const fetchClient = async (url, options = {}) => {
     const { headers, ...rest } = options;
+    /** @type {import("vue").Ref<Record<string, any> | null>} */
     const data = ref(null);
+    /** @type {import("vue").Ref<any>} */
     const error = ref(null);
     const isAuthEndpoint = AUTH_SKIP_REFRESH_PATHS.some((p) => url.includes(p));
 
