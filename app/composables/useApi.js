@@ -20,6 +20,9 @@ export const useApi = () => {
     platformUsers: useCrudApi("/v1/platform/users"),
     platformRoles: useCrudApi("/v1/platform/roles"),
     platformPermissions: useCrudApi("/v1/platform/permissions"),
+    platformIamUsers: useCrudApi("/v1/platform/iam/users"),
+    platformIamRoles: useCrudApi("/v1/platform/iam/roles"),
+    platformIamPermissions: useCrudApi("/v1/platform/iam/permissions"),
 
     // Platform Catalog - Menus, Features, Routes, Permissions (apidog-erp)
     catalogMenusTree: useCrudApi("/v1/platform/catalog/menus/tree"),

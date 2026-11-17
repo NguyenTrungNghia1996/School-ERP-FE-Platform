@@ -94,7 +94,7 @@
             <div class="flex flex-col gap-5 sm:flex-row sm:items-start">
               <div class="flex flex-col items-center rounded-xl border border-slate-200 bg-white p-3">
                 <ClientOnly>
-                  <AQRCode
+                  <AQrcode
                     v-if="mfaSetup.otpauth_url"
                     :value="mfaSetup.otpauth_url"
                     :size="176"

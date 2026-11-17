@@ -1,6 +1,9 @@
 import type {
+  IamResetUserPasswordInput,
   ResetUserPasswordInput,
+  UpdateRoleInput,
   UpdateRolePermissionsInput,
+  UpdateUserInput,
   UpdateUserRolesInput,
   UpdateUserStatusInput,
 } from "~/types/api/iam";
@@ -29,5 +32,27 @@ export const usePlatformIamApi = () => {
 
     updateRolePermissions: (id: string, body: UpdateRolePermissionsInput) =>
       fetchClient(`/v1/platform/roles/${id}/permissions`, { method: "PUT", body }),
+
+    // --- /v1/platform/iam/* (spec mới) ---
+    getIamRole: (id: string) =>
+      fetchClient(`/v1/platform/iam/roles/${id}`, { method: "GET" }),
+
+    updateIamRole: (id: string, body: UpdateRoleInput) =>
+      fetchClient(`/v1/platform/iam/roles/${id}`, { method: "PUT", body }),
+
+    deleteIamRole: (id: string) =>
+      fetchClient(`/v1/platform/iam/roles/${id}`, { method: "DELETE" }),
+
+    getIamUser: (id: string) =>
+      fetchClient(`/v1/platform/iam/users/${id}`, { method: "GET" }),
+
+    updateIamUser: (id: string, body: UpdateUserInput) =>
+      fetchClient(`/v1/platform/iam/users/${id}`, { method: "PATCH", body }),
+
+    resetIamUserPassword: (id: string, body: IamResetUserPasswordInput) =>
+      fetchClient(`/v1/platform/iam/users/${id}/reset-password`, { method: "POST", body }),
+
+    updateIamUserRoles: (id: string, body: UpdateUserRolesInput) =>
+      fetchClient(`/v1/platform/iam/users/${id}/roles`, { method: "PUT", body }),
   };
 };
