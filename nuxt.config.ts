@@ -10,6 +10,11 @@ export default defineNuxtConfig({
     icon: true,
   },
   css: ["antdv-next/dist/reset.css", "antdv-next/dist/antd.css"],
+  runtimeConfig: {
+    public: {
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || "",
+    },
+  },
   vite: {
     optimizeDeps: {
       include: ["@vue/devtools-core"],
