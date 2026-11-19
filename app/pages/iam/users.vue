@@ -120,6 +120,12 @@
                     <template #icon><Icon name="ant-design:safety-certificate-outlined" /></template>
                   </AButton>
                 </ATooltip>
+
+                <ATooltip v-if="record.id && record.id !== currentUser?.id" title="Xóa mềm nhân sự">
+                  <AButton size="small" danger @click="openDeleteUserModal(record)">
+                    <template #icon><Icon name="ant-design:delete-outlined" /></template>
+                  </AButton>
+                </ATooltip>
               </ASpace>
             </template>
           </template>
@@ -164,6 +170,9 @@
     <!-- Modal Tạo mới Nhân sự -->
     <AModal v-model:open="createOpen" title="Thêm nhân sự nền tảng" :confirm-loading="submitting" ok-text="Tạo nhân sự" cancel-text="Hủy" @ok="submitCreate">
       <AForm ref="createFormRef" :model="createForm" :rules="createRules" layout="vertical" class="mt-3">
+        <AFormItem label="Ảnh đại diện (Avatar)">
+          <ImageUploadField v-model="createForm.avatar_url" v-model:file="createAvatarFile" round />
+        </AFormItem>
         <AFormItem label="Họ và tên" name="full_name">
           <AInput v-model:value="createForm.full_name" placeholder="Trần Minh Anh" />
         </AFormItem>
@@ -191,6 +200,9 @@
     <!-- Modal Cập nhật thông tin & trạng thái -->
     <AModal v-model:open="editOpen" :title="`Cập nhật nhân sự — ${selectedUser?.full_name || selectedUser?.email || ''}`" :confirm-loading="submitting" ok-text="Lưu thay đổi" cancel-text="Hủy" @ok="submitEdit">
       <AForm ref="editFormRef" :model="editForm" :rules="editRules" layout="vertical" class="mt-3">
+        <AFormItem label="Ảnh đại diện (Avatar)">
+          <ImageUploadField v-model="editForm.avatar_url" v-model:file="editAvatarFile" round />
+        </AFormItem>
         <AFormItem label="Họ và tên" name="full_name">
           <AInput v-model:value="editForm.full_name" placeholder="Trần Minh Anh" />
         </AFormItem>
@@ -255,12 +267,37 @@
         </AFormItem>
       </AForm>
     </AModal>
+
+    <!-- Modal Xóa mềm Nhân sự (DELETE /v1/platform/iam/users/{id}) -->
+    <AModal
+      v-model:open="deleteOpen"
+      :title="`Xóa nhân sự — ${selectedUser?.full_name || selectedUser?.email || ''}`"
+      :confirm-loading="submitting"
+      ok-text="Xác nhận xóa"
+      :ok-button-props="{ danger: true }"
+      cancel-text="Hủy"
+      @ok="submitDeleteUser"
+    >
+      <AAlert
+        type="warning"
+        show-icon
+        class="mb-4"
+        title="Thao tác xóa mềm sẽ vô hiệu hóa tài khoản nhân sự này và dọn ảnh đại diện (nếu có)."
+      />
+      <AForm layout="vertical">
+        <AFormItem label="Lý do xóa (tùy chọn)">
+          <ATextarea v-model:value="deleteReason" :rows="3" placeholder="Nhân sự nghỉ việc / tạo nhầm" />
+        </AFormItem>
+      </AForm>
+    </AModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { message } from "antdv-next";
 import type { FormInstance, Rule, TableEmits } from "antdv-next";
+import ImageUploadField from "~/components/Base/ImageUploadField.vue";
+import { useMediaApi } from "~/composables/api/useMediaApi";
 import { usePlatformIamApi } from "~/composables/api/usePlatformIamApi";
 import type { CreateUserInput, PlatformRole, PlatformUser, UpdateUserInput } from "~/types/api/iam";
 
@@ -272,8 +309,10 @@ useHead({
   title: "Nhân sự Nền tảng (IAM) | School ERP",
 });
 
+const { user: currentUser, fetchMe } = useAuth();
 const { platformIamUsers, platformIamRoles } = useApi();
 const iamApi = usePlatformIamApi();
+const mediaApi = useMediaApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const searchInput = ref("");
@@ -415,11 +454,13 @@ const openDetailDrawer = async (record: PlatformUser) => {
 // --- Tạo mới nhân sự (POST /v1/platform/iam/users) ---
 const createOpen = ref(false);
 const createFormRef = ref<FormInstance>();
+const createAvatarFile = ref<File | null>(null);
 const createForm = reactive<CreateUserInput>({
   email: "",
   full_name: "",
   password: "",
   phone: "",
+  avatar_url: "",
   role_ids: [],
   must_change_password: true,
 });
@@ -437,10 +478,12 @@ const createRules: Record<string, Rule[]> = {
 };
 
 const openCreateModal = () => {
+  createAvatarFile.value = null;
   createForm.email = "";
   createForm.full_name = "";
   createForm.password = "";
   createForm.phone = "";
+  createForm.avatar_url = "";
   createForm.role_ids = [];
   createForm.must_change_password = true;
   createOpen.value = true;
@@ -450,17 +493,25 @@ const submitCreate = async () => {
   await createFormRef.value?.validate();
   submitting.value = true;
   try {
-    const payload: CreateUserInput = {
-      email: createForm.email.trim(),
-      full_name: createForm.full_name.trim(),
-      password: createForm.password,
-      must_change_password: createForm.must_change_password,
-      ...(createForm.phone?.trim() ? { phone: createForm.phone.trim() } : {}),
-      ...(createForm.role_ids?.length ? { role_ids: createForm.role_ids } : {}),
-    };
-    const { data, error } = await platformIamUsers.post(payload);
-    if (handleApiError(data, error, "Tạo nhân sự thất bại!")) return;
-    message.success(unref(data)?.message || "Tạo nhân sự thành công!");
+    const { ok, res } = await mediaApi.saveWithImageReplace({
+      file: createAvatarFile.value,
+      currentUrl: createForm.avatar_url,
+      folder: "avatars",
+      errorMessage: "Tạo nhân sự thất bại!",
+      saveFn: (finalUrl) =>
+        platformIamUsers.post({
+          email: createForm.email.trim(),
+          full_name: createForm.full_name.trim(),
+          password: createForm.password,
+          must_change_password: createForm.must_change_password,
+          ...(finalUrl ? { avatar_url: finalUrl } : {}),
+          ...(createForm.phone?.trim() ? { phone: createForm.phone.trim() } : {}),
+          ...(createForm.role_ids?.length ? { role_ids: createForm.role_ids } : {}),
+        }),
+    });
+    if (!ok) return;
+
+    message.success((unref(res?.data) as { message?: string } | null)?.message || "Tạo nhân sự thành công!");
     createOpen.value = false;
     await refresh();
   } finally {
@@ -471,9 +522,11 @@ const submitCreate = async () => {
 // --- Cập nhật thông tin & trạng thái (PATCH /v1/platform/iam/users/{id}) ---
 const editOpen = ref(false);
 const editFormRef = ref<FormInstance>();
+const editAvatarFile = ref<File | null>(null);
 const editForm = reactive<UpdateUserInput>({
   full_name: "",
   phone: "",
+  avatar_url: "",
   status: "ACTIVE",
   reason: "",
 });
@@ -485,8 +538,10 @@ const editRules: Record<string, Rule[]> = {
 
 const openEditModal = (record: PlatformUser) => {
   selectedUser.value = record;
+  editAvatarFile.value = null;
   editForm.full_name = record.full_name || "";
   editForm.phone = record.phone || "";
+  editForm.avatar_url = record.avatar_url || "";
   editForm.status = record.status || "ACTIVE";
   editForm.reason = "";
   editOpen.value = true;
@@ -494,20 +549,33 @@ const openEditModal = (record: PlatformUser) => {
 
 const submitEdit = async () => {
   if (!selectedUser.value?.id) return;
+  const targetUserId = selectedUser.value.id;
   await editFormRef.value?.validate();
   submitting.value = true;
   try {
-    const payload: UpdateUserInput = {
-      full_name: editForm.full_name?.trim(),
-      phone: editForm.phone?.trim() || undefined,
-      status: editForm.status,
-      ...(editForm.reason?.trim() ? { reason: editForm.reason.trim() } : {}),
-    };
-    const { data, error } = await iamApi.updateIamUser(selectedUser.value.id, payload);
-    if (handleApiError(data, error, "Cập nhật nhân sự thất bại!")) return;
-    message.success(unref(data)?.message || "Cập nhật nhân sự thành công!");
+    const { ok, res } = await mediaApi.saveWithImageReplace({
+      file: editAvatarFile.value,
+      currentUrl: editForm.avatar_url,
+      previousUrl: selectedUser.value.avatar_url,
+      folder: "avatars",
+      errorMessage: "Cập nhật nhân sự thất bại!",
+      saveFn: (finalUrl) =>
+        iamApi.updateIamUser(targetUserId, {
+          full_name: editForm.full_name?.trim(),
+          phone: editForm.phone?.trim() || undefined,
+          avatar_url: finalUrl,
+          status: editForm.status,
+          ...(editForm.reason?.trim() ? { reason: editForm.reason.trim() } : {}),
+        }),
+    });
+    if (!ok) return;
+
+    message.success((unref(res?.data) as { message?: string } | null)?.message || "Cập nhật nhân sự thành công!");
     editOpen.value = false;
     await refresh();
+    if (currentUser.value?.id === targetUserId) {
+      await fetchMe(true);
+    }
   } finally {
     submitting.value = false;
   }
@@ -581,7 +649,7 @@ const submitResetPassword = async () => {
   }
 };
 
-// --- Tắt MFA bắt buộc (PATCH /v1/platform/users/{id}/mfa/disable) ---
+// --- Tắt MFA bắt buộc (PATCH /v1/platform/iam/users/{id}/mfa/disable) ---
 const mfaOpen = ref(false);
 const mfaReason = ref("");
 
@@ -595,13 +663,43 @@ const submitDisableMfa = async () => {
   if (!selectedUser.value?.id) return;
   submitting.value = true;
   try {
-    const body: Record<string, string> = mfaReason.value.trim()
-      ? { reason: mfaReason.value.trim() }
-      : {};
-    const { data, error } = await iamApi.disableUserMfa(selectedUser.value.id, body);
+    const body = mfaReason.value.trim() ? { reason: mfaReason.value.trim() } : {};
+    const { data, error } = await iamApi.disableIamUserMfa(selectedUser.value.id, body);
     if (handleApiError(data, error, "Tắt MFA cho nhân sự thất bại!")) return;
     message.success(unref(data)?.message || "Đã tắt MFA cho nhân sự!");
     mfaOpen.value = false;
+    await refresh();
+  } finally {
+    submitting.value = false;
+  }
+};
+
+// --- Xóa mềm nhân sự (DELETE /v1/platform/iam/users/{id}) ---
+const deleteOpen = ref(false);
+const deleteReason = ref("");
+
+const openDeleteUserModal = (record: PlatformUser) => {
+  selectedUser.value = record;
+  deleteReason.value = "";
+  deleteOpen.value = true;
+};
+
+const submitDeleteUser = async () => {
+  if (!selectedUser.value?.id) return;
+  const avatarToDelete = selectedUser.value.avatar_url;
+  submitting.value = true;
+  try {
+    const { data, error } = await iamApi.deleteIamUser(
+      selectedUser.value.id,
+      deleteReason.value.trim() || undefined,
+    );
+    if (handleApiError(data, error, "Xóa nhân sự thất bại!")) return;
+
+    if (avatarToDelete) {
+      await mediaApi.deleteMediaByUrl(avatarToDelete).catch(() => {});
+    }
+    message.success(unref(data)?.message || "Đã xóa nhân sự!");
+    deleteOpen.value = false;
     await refresh();
   } finally {
     submitting.value = false;

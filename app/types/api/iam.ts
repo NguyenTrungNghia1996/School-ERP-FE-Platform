@@ -81,6 +81,7 @@ export interface CreateUserInput {
   full_name: string;
   password: string;
   phone?: string;
+  avatar_url?: string;
   role_ids?: string[];
   must_change_password?: boolean;
 }
@@ -89,6 +90,7 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   full_name?: string;
   phone?: string;
+  avatar_url?: string;
   status?: string;
   reason?: string;
 }

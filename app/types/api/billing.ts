@@ -51,6 +51,14 @@ export interface CreatePackageInput {
   is_public?: boolean;
 }
 
+/** Input cập nhật gói dịch vụ PUT/PATCH /v1/platform/packages/{id} (billing.UpdatePackageInput) */
+export interface UpdatePackageInput {
+  name?: string;
+  description?: string;
+  is_active?: boolean;
+  is_public?: boolean;
+}
+
 /** Input tạo phiên bản mới DRAFT (billing.CreateVersionInput) */
 export interface CreateVersionInput {
   version_label?: string;

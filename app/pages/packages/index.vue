@@ -98,22 +98,38 @@
             </template>
 
             <template v-else-if="column.key === 'actions'">
-              <AButton size="small" type="primary" ghost @click="navigateTo(`/packages/${record.id}`)">
-                <template #icon><Icon name="ant-design:eye-outlined" /></template>
-                Phiên bản
-              </AButton>
+              <ASpace size="small">
+                <AButton size="small" type="primary" ghost @click="navigateTo(`/packages/${record.id}`)">
+                  <template #icon><Icon name="ant-design:eye-outlined" /></template>
+                  Phiên bản
+                </AButton>
+                <AButton size="small" @click="openEditModal(record)">
+                  <template #icon><Icon name="ant-design:edit-outlined" /></template>
+                </AButton>
+                <APopconfirm
+                  v-if="record.id"
+                  title="Xóa gói dịch vụ này? (Chỉ xóa được khi chưa có phiên bản PUBLISHED hoặc Tổ chức đăng ký)"
+                  ok-text="Xóa"
+                  cancel-text="Hủy"
+                  @confirm="handleDeletePackage(record)"
+                >
+                  <AButton size="small" danger :loading="deletingPackageId === record.id">
+                    <template #icon><Icon name="ant-design:delete-outlined" /></template>
+                  </AButton>
+                </APopconfirm>
+              </ASpace>
             </template>
           </template>
         </ATable>
       </ClientOnly>
     </ACard>
 
-    <!-- Modal Tạo mới gói -->
+    <!-- Modal Tạo mới / Cập nhật gói -->
     <AModal
       v-model:open="createOpen"
-      title="Tạo mới gói dịch vụ"
+      :title="editingPackageId ? 'Cập nhật gói dịch vụ' : 'Tạo mới gói dịch vụ'"
       :confirm-loading="submitting"
-      ok-text="Tạo gói"
+      :ok-text="editingPackageId ? 'Lưu thay đổi' : 'Tạo gói'"
       cancel-text="Hủy"
       @ok="submitCreate"
     >
@@ -121,12 +137,21 @@
         <ARow :gutter="12">
           <ACol :span="12">
             <AFormItem label="Mã gói (Code)" name="code">
-              <AInput v-model:value="createForm.code" placeholder="STANDARD_SCHOOL" class="font-mono" />
+              <AInput
+                v-model:value="createForm.code"
+                placeholder="STANDARD_SCHOOL"
+                class="font-mono"
+                :disabled="Boolean(editingPackageId)"
+              />
             </AFormItem>
           </ACol>
           <ACol :span="12">
             <AFormItem label="Loại gói" name="package_type">
-              <ASelect v-model:value="createForm.package_type" :options="packageTypeOptions" />
+              <ASelect
+                v-model:value="createForm.package_type"
+                :options="packageTypeOptions"
+                :disabled="Boolean(editingPackageId)"
+              />
             </AFormItem>
           </ACol>
         </ARow>
@@ -151,6 +176,7 @@
 <script setup lang="ts">
 import { message } from "antdv-next";
 import type { FormInstance, Rule, TableProps } from "antdv-next";
+import { useBillingApi } from "~/composables/api/useBillingApi";
 import type { CreatePackageInput, ServicePackageWithSummary } from "~/types/api/billing";
 
 definePageMeta({
@@ -162,6 +188,7 @@ useHead({
 });
 
 const { platformPackages } = useApi();
+const billingApi = useBillingApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const searchQuery = ref("");
@@ -220,11 +247,13 @@ const columns: TableProps["columns"] = [
   { title: "Phiên bản phát hành mới nhất", key: "latest_version", width: 230 },
   { title: "Đang sử dụng", key: "active_org_count", width: 140, align: "center" },
   { title: "Trạng thái", key: "is_active", width: 120, align: "center" },
-  { title: "Thao tác", key: "actions", width: 120, fixed: "right" },
+  { title: "Thao tác", key: "actions", width: 200, fixed: "right" },
 ];
 
-// Create modal
+// Create / Edit modal
 const createOpen = ref(false);
+const editingPackageId = ref<string | null>(null);
+const deletingPackageId = ref<string | null>(null);
 const submitting = ref(false);
 const formRef = ref<FormInstance>();
 
@@ -244,12 +273,25 @@ const formRules: Record<string, Rule[]> = {
 };
 
 const openCreateModal = () => {
+  editingPackageId.value = null;
   createForm.code = "";
   createForm.name = "";
   createForm.package_type = "PRIMARY";
   createForm.description = "";
   createForm.is_active = true;
   createForm.is_public = true;
+  createOpen.value = true;
+};
+
+const openEditModal = (record: ServicePackageWithSummary) => {
+  if (!record.id) return;
+  editingPackageId.value = record.id;
+  createForm.code = record.code || "";
+  createForm.name = record.name || "";
+  createForm.package_type = record.package_type || "PRIMARY";
+  createForm.description = record.description || "";
+  createForm.is_active = record.is_active ?? true;
+  createForm.is_public = record.is_public ?? true;
   createOpen.value = true;
 };
 
@@ -262,21 +304,47 @@ const submitCreate = async () => {
 
   submitting.value = true;
   try {
-    const { data, error } = await platformPackages.post({
-      code: createForm.code.trim(),
-      name: createForm.name.trim(),
-      package_type: createForm.package_type,
-      description: createForm.description.trim() || undefined,
-      is_active: createForm.is_active,
-      is_public: createForm.is_public,
-    });
-    if (handleApiError(data, error, "Tạo gói dịch vụ thất bại!")) return;
+    const { data, error } = editingPackageId.value
+      ? await billingApi.updatePackage(editingPackageId.value, {
+          name: createForm.name.trim(),
+          description: createForm.description.trim() || undefined,
+          is_active: createForm.is_active,
+          is_public: createForm.is_public,
+        })
+      : await platformPackages.post({
+          code: createForm.code.trim(),
+          name: createForm.name.trim(),
+          package_type: createForm.package_type,
+          description: createForm.description.trim() || undefined,
+          is_active: createForm.is_active,
+          is_public: createForm.is_public,
+        });
 
-    message.success((unref(data) as { message?: string } | null)?.message || "Tạo gói dịch vụ thành công!");
+    if (handleApiError(data, error, editingPackageId.value ? "Cập nhật gói dịch vụ thất bại!" : "Tạo gói dịch vụ thất bại!")) {
+      return;
+    }
+
+    message.success(
+      (unref(data) as { message?: string } | null)?.message ||
+        (editingPackageId.value ? "Cập nhật gói dịch vụ thành công!" : "Tạo gói dịch vụ thành công!"),
+    );
     createOpen.value = false;
     await refresh();
   } finally {
     submitting.value = false;
+  }
+};
+
+const handleDeletePackage = async (record: ServicePackageWithSummary) => {
+  if (!record.id) return;
+  deletingPackageId.value = record.id;
+  try {
+    const { data, error } = await billingApi.deletePackage(record.id);
+    if (handleApiError(data, error, "Xóa gói dịch vụ thất bại!")) return;
+    message.success((unref(data) as { message?: string } | null)?.message || "Đã xóa gói dịch vụ!");
+    await refresh();
+  } finally {
+    deletingPackageId.value = null;
   }
 };
 </script>

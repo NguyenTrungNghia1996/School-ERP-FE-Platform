@@ -105,6 +105,15 @@
                   <AButton size="small" type="primary">Phát hành</AButton>
                 </APopconfirm>
                 <APopconfirm
+                  v-if="record.status === 'DRAFT'"
+                  title="Xóa phiên bản DRAFT này?"
+                  ok-text="Xóa"
+                  cancel-text="Hủy"
+                  @confirm="handleDeleteVersion(record)"
+                >
+                  <AButton size="small" danger>Xóa</AButton>
+                </APopconfirm>
+                <APopconfirm
                   v-if="record.status === 'PUBLISHED'"
                   title="Ngừng phát hành (Deprecate) phiên bản này?"
                   ok-text="Ngừng phát hành"
@@ -414,6 +423,14 @@ const handleDeprecate = async (record: ServicePackageVersion) => {
   const { data, error } = await billingApi.deprecatePackageVersion(record.id);
   if (handleApiError(data, error, "Ngừng phát hành phiên bản thất bại!")) return;
   message.success("Đã ngừng phát hành phiên bản!");
+  await loadDetail();
+};
+
+const handleDeleteVersion = async (record: ServicePackageVersion) => {
+  if (!record.id) return;
+  const { data, error } = await billingApi.deletePackageVersion(record.id);
+  if (handleApiError(data, error, "Xóa phiên bản DRAFT thất bại!")) return;
+  message.success("Đã xóa phiên bản DRAFT!");
   await loadDetail();
 };
 </script>

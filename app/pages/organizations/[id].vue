@@ -7,6 +7,9 @@
           <AButton @click="navigateTo('/organizations')">
             <template #icon><Icon name="ant-design:arrow-left-outlined" /></template>
           </AButton>
+          <AAvatar :size="48" shape="square" :src="org?.logo_url || undefined" class="shrink-0 bg-slate-100 text-slate-500">
+            <template #icon><Icon name="ant-design:bank-outlined" /></template>
+          </AAvatar>
           <div>
             <div class="flex flex-wrap items-center gap-2">
               <ATypographyTitle :level="4" style="margin: 0">
@@ -24,6 +27,11 @@
         </div>
 
         <ASpace wrap>
+          <AButton @click="openEditOrgModal">
+            <template #icon><Icon name="ant-design:edit-outlined" /></template>
+            Chỉnh sửa thông tin
+          </AButton>
+
           <AButton :loading="loading" @click="loadAll">
             <template #icon><Icon name="ant-design:reload-outlined" /></template>
             Làm mới
@@ -45,12 +53,22 @@
 
           <AButton @click="openSubdomainModal">Đổi Subdomain</AButton>
 
-          <AButton
-            v-if="org?.dns_status && org.dns_status !== 'SYNCED'"
-            :loading="actionLoading"
-            @click="handleRetryDns"
+          <APopconfirm
+            v-if="needsCloudflareSubdomain"
+            :title="`Tạo lại subdomain '${org?.subdomain}' trên Cloudflare DNS?`"
+            ok-text="Tạo lại"
+            cancel-text="Hủy"
+            @confirm="handleRetryDns"
           >
-            Retry DNS
+            <AButton :loading="actionLoading">
+              <template #icon><Icon name="ant-design:cloud-sync-outlined" /></template>
+              Tạo lại Sub Cloudflare
+            </AButton>
+          </APopconfirm>
+
+          <AButton danger @click="openDeleteOrgModal">
+            <template #icon><Icon name="ant-design:delete-outlined" /></template>
+            Xóa Tổ chức
           </AButton>
         </ASpace>
       </AFlex>
@@ -205,6 +223,50 @@
           <AEmpty v-else description="Chưa có dữ liệu Entitlements" />
         </ASpin>
       </div>
+
+      <!-- Tab 4: Trường học trực thuộc (GET /v1/platform/organizations/{id}/schools) -->
+      <div v-else-if="activeTab === 'schools'" class="mt-3">
+        <ClientOnly>
+          <ATable
+            :columns="schoolColumns"
+            :data-source="schools"
+            :loading="loadingSchools"
+            :pagination="false"
+            row-key="id"
+            size="small"
+            :scroll="{ x: 900 }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'name'">
+                <div class="flex items-center gap-2.5">
+                  <AAvatar :size="32" shape="square" :src="record.logo_url || undefined" class="shrink-0 bg-slate-100 text-slate-500">
+                    <template #icon><Icon name="ant-design:apartment-outlined" /></template>
+                  </AAvatar>
+                  <div>
+                    <div class="flex items-center gap-1.5 font-medium text-slate-800">
+                      <span>{{ record.name || "—" }}</span>
+                      <ATag v-if="record.is_main" color="blue" class="!m-0 text-[10px]">Trường chính</ATag>
+                    </div>
+                    <div class="font-mono text-xs text-slate-500">{{ record.code || "—" }}</div>
+                  </div>
+                </div>
+              </template>
+              <template v-else-if="column.key === 'contact'">
+                <div class="text-xs text-slate-700">{{ record.email || "—" }}</div>
+                <div class="text-xs text-slate-500">{{ record.phone || "—" }}</div>
+              </template>
+              <template v-else-if="column.key === 'status'">
+                <ATag :color="record.status === 'ACTIVE' ? 'success' : 'default'">{{ record.status || "—" }}</ATag>
+              </template>
+            </template>
+          </ATable>
+        </ClientOnly>
+      </div>
+
+      <!-- Tab 5: Media & Lưu trữ -->
+      <div v-else-if="activeTab === 'media'" class="mt-3">
+        <OrgMediaTab :org-id="orgId" />
+      </div>
     </ACard>
 
     <!-- Modal Đổi trạng thái Tổ chức -->
@@ -282,20 +344,90 @@
         </AFormItem>
       </AForm>
     </AModal>
+
+    <!-- Modal Chỉnh sửa thông tin & Logo Tổ chức (PATCH /v1/platform/organizations/{id}) -->
+    <AModal
+      v-model:open="editOrgModalOpen"
+      title="Chỉnh sửa thông tin Tổ chức"
+      :confirm-loading="actionLoading"
+      ok-text="Lưu thay đổi"
+      cancel-text="Hủy"
+      width="620px"
+      @ok="submitEditOrg"
+    >
+      <AForm ref="editOrgFormRef" :model="editOrgForm" :rules="editOrgRules" layout="vertical" class="mt-3">
+        <AFormItem label="Logo Tổ chức">
+          <ImageUploadField v-model="editOrgForm.logo_url" v-model:file="editOrgLogoFile" />
+        </AFormItem>
+        <ARow :gutter="12">
+          <ACol :xs="24" :sm="14">
+            <AFormItem label="Tên Tổ chức" name="name">
+              <AInput v-model:value="editOrgForm.name" placeholder="Hệ thống Trường THPT Chu Văn An" />
+            </AFormItem>
+          </ACol>
+          <ACol :xs="24" :sm="10">
+            <AFormItem label="Mã số thuế" name="tax_code">
+              <AInput v-model:value="editOrgForm.tax_code" placeholder="0101234567" />
+            </AFormItem>
+          </ACol>
+        </ARow>
+        <ARow :gutter="12">
+          <ACol :xs="24" :sm="12">
+            <AFormItem label="Email liên hệ" name="contact_email">
+              <AInput v-model:value="editOrgForm.contact_email" placeholder="contact@chuvanan.edu.vn" />
+            </AFormItem>
+          </ACol>
+          <ACol :xs="24" :sm="12">
+            <AFormItem label="Số điện thoại liên hệ" name="contact_phone">
+              <AInput v-model:value="editOrgForm.contact_phone" placeholder="02438889999" />
+            </AFormItem>
+          </ACol>
+        </ARow>
+        <AFormItem label="Địa chỉ" name="address">
+          <AInput v-model:value="editOrgForm.address" placeholder="Số 10 Thụy Khuê, Tây Hồ, Hà Nội" />
+        </AFormItem>
+      </AForm>
+    </AModal>
+
+    <!-- Modal Xóa mềm Tổ chức (DELETE /v1/platform/organizations/{id}) -->
+    <AModal
+      v-model:open="deleteOrgModalOpen"
+      :title="`Xóa Tổ chức — ${org?.name || org?.code || ''}`"
+      :confirm-loading="actionLoading"
+      ok-text="Xác nhận xóa"
+      :ok-button-props="{ danger: true }"
+      cancel-text="Hủy"
+      @ok="submitDeleteOrg"
+    >
+      <AAlert
+        type="warning"
+        show-icon
+        class="mb-4"
+        title="Thao tác xóa mềm sẽ dọn DNS Cloudflare, thu hồi các phiên hỗ trợ, xóa cache Redis và gỡ logo Tổ chức."
+      />
+      <AForm layout="vertical">
+        <AFormItem label="Lý do xóa (tùy chọn)">
+          <ATextarea v-model:value="deleteOrgReason" :rows="3" placeholder="Tổ chức ngừng sử dụng hoặc tạo nhầm" />
+        </AFormItem>
+      </AForm>
+    </AModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { message } from "antdv-next";
-import type { DescriptionsItemType, TableProps, TabsProps } from "antdv-next";
+import type { DescriptionsItemType, FormInstance, Rule, TableProps, TabsProps } from "antdv-next";
+import ImageUploadField from "~/components/Base/ImageUploadField.vue";
+import OrgMediaTab from "~/components/Organizations/OrgMediaTab.vue";
 import { useBillingApi } from "~/composables/api/useBillingApi";
+import { useMediaApi } from "~/composables/api/useMediaApi";
 import { useTenantApi } from "~/composables/api/useTenantApi";
 import type {
   OrganizationEntitlement,
   OrganizationSubscription,
   ServicePackageWithSummary,
 } from "~/types/api/billing";
-import type { Organization, OrganizationSubdomainHistory } from "~/types/api/tenant";
+import type { Organization, OrganizationSubdomainHistory, TenantSchool } from "~/types/api/tenant";
 
 definePageMeta({
   middleware: ["permission"],
@@ -311,21 +443,26 @@ const orgId = computed(() => String(route.params.id || ""));
 const { platformPackages } = useApi();
 const tenantApi = useTenantApi();
 const billingApi = useBillingApi();
+const mediaApi = useMediaApi();
 const { extractApiData, handleApiError } = useApiError();
 
-const activeTab = ref<"overview" | "subscriptions" | "entitlements">("overview");
+const activeTab = ref<"overview" | "schools" | "subscriptions" | "entitlements" | "media">("overview");
 const tabItems: TabsProps["items"] = [
   { key: "overview", label: "Tổng quan & DNS" },
+  { key: "schools", label: "Trường học trực thuộc" },
   { key: "subscriptions", label: "Gói dịch vụ (Subscriptions)" },
   { key: "entitlements", label: "Quyền lợi hiệu lực (Entitlements)" },
+  { key: "media", label: "Media & Lưu trữ" },
 ];
 
 const loading = ref(false);
+const loadingSchools = ref(false);
 const loadingSubs = ref(false);
 const loadingEntitlements = ref(false);
 const actionLoading = ref(false);
 
 const org = ref<Organization | null>(null);
+const schools = ref<TenantSchool[]>([]);
 const subscriptions = ref<OrganizationSubscription[]>([]);
 const entitlements = ref<OrganizationEntitlement | null>(null);
 
@@ -366,8 +503,21 @@ const loadEntitlements = async () => {
   }
 };
 
+const loadSchools = async () => {
+  if (!orgId.value) return;
+  loadingSchools.value = true;
+  try {
+    const { data, error } = await tenantApi.getOrganizationSchools(orgId.value);
+    if (handleApiError(data, error, "Không thể tải danh sách trường học!")) return;
+    const list = extractApiData(data);
+    schools.value = Array.isArray(list) ? (list as TenantSchool[]) : [];
+  } finally {
+    loadingSchools.value = false;
+  }
+};
+
 const loadAll = async () => {
-  await Promise.all([loadOrg(), loadSubscriptions(), loadEntitlements()]);
+  await Promise.all([loadOrg(), loadSchools(), loadSubscriptions(), loadEntitlements()]);
 };
 
 // Load packages để chọn version khi cấp gói
@@ -470,6 +620,14 @@ const historyColumns: TableProps["columns"] = [
   { title: "Thao tác", key: "actions", width: 130 },
 ];
 
+const schoolColumns: TableProps["columns"] = [
+  { title: "Trường học", key: "name", width: 280 },
+  { title: "Cấp học", dataIndex: "level", key: "level", width: 130 },
+  { title: "Liên hệ", key: "contact", width: 220 },
+  { title: "Địa chỉ", dataIndex: "address", key: "address" },
+  { title: "Trạng thái", key: "status", width: 120, align: "center" },
+];
+
 const subColumns: TableProps["columns"] = [
   { title: "Gói & Phiên bản", key: "package", width: 240 },
   { title: "Loại", key: "type", width: 110, align: "center" },
@@ -496,13 +654,21 @@ const handleRetryDns = async () => {
   actionLoading.value = true;
   try {
     const { data, error } = await tenantApi.retryOrganizationDns(orgId.value);
-    if (handleApiError(data, error, "Thử lại đồng bộ DNS thất bại!")) return;
-    message.success("Đã gửi yêu cầu đồng bộ lại DNS!");
+    if (handleApiError(data, error, "Tạo lại subdomain trên Cloudflare DNS thất bại!")) return;
+    message.success("Đã tạo lại bản ghi subdomain trên Cloudflare!");
     await loadOrg();
   } finally {
     actionLoading.value = false;
   }
 };
+
+const needsCloudflareSubdomain = computed(() =>
+  Boolean(
+    org.value?.id &&
+      org.value?.subdomain &&
+      (!org.value.cloudflare_dns_record_id || !["SYNCED", "ACTIVE"].includes(org.value.dns_status || "")),
+  ),
+);
 
 const handleDeleteHistoryDns = async (record: OrganizationSubdomainHistory) => {
   if (!record.id) return;
@@ -543,6 +709,98 @@ const submitStatus = async () => {
 
 const subdomainModalOpen = ref(false);
 const subdomainForm = reactive({ new_subdomain: "", reason: "" });
+
+const editOrgModalOpen = ref(false);
+const editOrgFormRef = ref<FormInstance>();
+const editOrgLogoFile = ref<File | null>(null);
+const editOrgForm = reactive({
+  name: "",
+  logo_url: "",
+  contact_email: "",
+  contact_phone: "",
+  tax_code: "",
+  address: "",
+});
+const editOrgRules: Record<string, Rule[]> = {
+  name: [{ required: true, message: "Vui lòng nhập tên Tổ chức", trigger: "blur" }],
+};
+
+const openEditOrgModal = () => {
+  editOrgLogoFile.value = null;
+  editOrgForm.name = org.value?.name || "";
+  editOrgForm.logo_url = org.value?.logo_url || "";
+  editOrgForm.contact_email = org.value?.contact_email || "";
+  editOrgForm.contact_phone = org.value?.contact_phone || "";
+  editOrgForm.tax_code = org.value?.tax_code || "";
+  editOrgForm.address = org.value?.address || "";
+  editOrgModalOpen.value = true;
+};
+
+const submitEditOrg = async () => {
+  try {
+    await editOrgFormRef.value?.validate();
+  } catch {
+    return;
+  }
+
+  actionLoading.value = true;
+  try {
+    const { ok } = await mediaApi.saveWithImageReplace({
+      file: editOrgLogoFile.value,
+      currentUrl: editOrgForm.logo_url,
+      previousUrl: org.value?.logo_url,
+      orgId: orgId.value,
+      folder: "logos",
+      errorMessage: "Cập nhật thông tin Tổ chức thất bại!",
+      saveFn: (finalUrl) =>
+        tenantApi.updateOrganization(orgId.value, {
+          name: editOrgForm.name.trim(),
+          logo_url: finalUrl,
+          contact_email: editOrgForm.contact_email.trim() || undefined,
+          contact_phone: editOrgForm.contact_phone.trim() || undefined,
+          tax_code: editOrgForm.tax_code.trim() || undefined,
+          address: editOrgForm.address.trim() || undefined,
+        }),
+    });
+    if (!ok) return;
+
+    message.success("Đã cập nhật thông tin Tổ chức!");
+    editOrgModalOpen.value = false;
+    await loadOrg();
+  } finally {
+    actionLoading.value = false;
+  }
+};
+
+const deleteOrgModalOpen = ref(false);
+const deleteOrgReason = ref("");
+
+const openDeleteOrgModal = () => {
+  deleteOrgReason.value = "";
+  deleteOrgModalOpen.value = true;
+};
+
+const submitDeleteOrg = async () => {
+  if (!orgId.value) return;
+  const logoToDelete = org.value?.logo_url;
+  actionLoading.value = true;
+  try {
+    const { data, error } = await tenantApi.deleteOrganization(
+      orgId.value,
+      deleteOrgReason.value.trim() || undefined,
+    );
+    if (handleApiError(data, error, "Xóa Tổ chức thất bại!")) return;
+
+    if (logoToDelete) {
+      await mediaApi.deleteMediaByUrl(logoToDelete, orgId.value).catch(() => {});
+    }
+    message.success((unref(data) as { message?: string } | null)?.message || "Đã xóa Tổ chức!");
+    deleteOrgModalOpen.value = false;
+    await navigateTo("/organizations");
+  } finally {
+    actionLoading.value = false;
+  }
+};
 
 const openSubdomainModal = () => {
   subdomainForm.new_subdomain = org.value?.subdomain || "";

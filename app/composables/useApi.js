@@ -36,6 +36,8 @@ export const useApi = () => {
     platformOrganizations: useCrudApi("/v1/platform/organizations"),
     platformOrganizationsCheckSubdomain: useCrudApi("/v1/platform/organizations/check-subdomain"),
     platformReservedSubdomains: useCrudApi("/v1/platform/reserved-subdomains"),
+    platformReservedSubdomainsSyncCloudflare: useCrudApi("/v1/platform/reserved-subdomains/sync-cloudflare"),
+    platformDashboardStats: useCrudApi("/v1/platform/dashboard/stats"),
     publicTenantResolve: useCrudApi("/v1/public/tenant-resolve"),
 
     // Platform Billing & Packages (apidog-erp)

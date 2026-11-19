@@ -3,6 +3,7 @@ import type {
   CreateVersionInput,
   RenewSubscriptionInput,
   SwitchPrimaryInput,
+  UpdatePackageInput,
   UpdateVersionInput,
 } from "~/types/api/billing";
 
@@ -15,11 +16,19 @@ export const useBillingApi = () => {
   return {
     getPackage: (id: string) => fetchClient(`/v1/platform/packages/${id}`, { method: "GET" }),
 
+    updatePackage: (id: string, body: UpdatePackageInput) =>
+      fetchClient(`/v1/platform/packages/${id}`, { method: "PATCH", body }),
+
+    deletePackage: (id: string) => fetchClient(`/v1/platform/packages/${id}`, { method: "DELETE" }),
+
     createPackageVersion: (packageId: string, body: CreateVersionInput) =>
       fetchClient(`/v1/platform/packages/${packageId}/versions`, { method: "POST", body }),
 
     updatePackageVersion: (versionId: string, body: UpdateVersionInput) =>
       fetchClient(`/v1/platform/package-versions/${versionId}`, { method: "PUT", body }),
+
+    deletePackageVersion: (versionId: string) =>
+      fetchClient(`/v1/platform/package-versions/${versionId}`, { method: "DELETE" }),
 
     publishPackageVersion: (versionId: string) =>
       fetchClient(`/v1/platform/package-versions/${versionId}/publish`, { method: "POST" }),

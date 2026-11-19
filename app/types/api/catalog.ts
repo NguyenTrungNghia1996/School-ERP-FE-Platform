@@ -98,6 +98,34 @@ export interface CreateMenuInput {
   target_portals?: string[];
 }
 
+/** Payload cập nhật node menu PUT/PATCH /v1/platform/catalog/menus/{id} (catalog.UpdateMenuInput) */
+export interface UpdateMenuInput {
+  label?: string;
+  menu_type?: string;
+  icon?: string;
+  parent_id?: string;
+  feature_id?: string;
+  route_id?: string;
+  sort_order?: number;
+  is_active?: boolean;
+  is_mandatory?: boolean;
+  permission_match_mode?: string;
+  required_permissions?: string[];
+  target_portals?: string[];
+}
+
+/** Payload tạo mới Route POST /v1/platform/catalog/routes (catalog.CreateRouteInput) */
+export interface CreateRouteInput {
+  route_key?: string;
+  name?: string;
+  path?: string;
+  feature_id?: string;
+  is_active?: boolean;
+}
+
+/** Payload cập nhật Route PUT /v1/platform/catalog/routes/{id} (catalog.UpdateRouteInput) */
+export type UpdateRouteInput = CreateRouteInput;
+
 /** Phần tử sắp xếp lại cây menu PUT /v1/platform/catalog/menus/reorder (catalog.ReorderMenuItem) */
 export interface ReorderMenuItem {
   id: string;

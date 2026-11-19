@@ -85,10 +85,23 @@
             </template>
 
             <template v-else-if="column.key === 'actions'">
-              <AButton size="small" @click="openModal(record)">
-                <template #icon><Icon name="ant-design:edit-outlined" /></template>
-                Sửa
-              </AButton>
+              <ASpace size="small">
+                <AButton size="small" @click="openModal(record)">
+                  <template #icon><Icon name="ant-design:edit-outlined" /></template>
+                  Sửa
+                </AButton>
+                <APopconfirm
+                  v-if="record.id && !record.is_core"
+                  title="Xóa tính năng này khỏi Catalog?"
+                  ok-text="Xóa"
+                  cancel-text="Hủy"
+                  @confirm="handleDeleteFeature(record)"
+                >
+                  <AButton size="small" danger :loading="deletingId === record.id">
+                    <template #icon><Icon name="ant-design:delete-outlined" /></template>
+                  </AButton>
+                </APopconfirm>
+              </ASpace>
             </template>
           </template>
         </ATable>
@@ -202,7 +215,7 @@ const columns: TableProps["columns"] = [
   { title: "Module", key: "module", width: 150 },
   { title: "Mô tả", dataIndex: "description", key: "description" },
   { title: "Trạng thái", key: "is_active", width: 120, align: "center" },
-  { title: "Thao tác", key: "actions", width: 100, fixed: "right" },
+  { title: "Thao tác", key: "actions", width: 150, fixed: "right" },
 ];
 
 // Create / Edit Modal
@@ -281,6 +294,20 @@ const handleSubmit = async () => {
     await refresh();
   } finally {
     submitting.value = false;
+  }
+};
+
+const deletingId = ref<string | null>(null);
+const handleDeleteFeature = async (record: CatalogFeature) => {
+  if (!record.id) return;
+  deletingId.value = record.id;
+  try {
+    const { data, error } = await catalogApi.deleteFeature(record.id);
+    if (handleApiError(data, error, "Xóa tính năng thất bại!")) return;
+    message.success((unref(data) as { message?: string } | null)?.message || "Đã xóa tính năng khỏi Catalog!");
+    await refresh();
+  } finally {
+    deletingId.value = null;
   }
 };
 </script>

@@ -49,6 +49,15 @@ export const usePlatformIamApi = () => {
     updateIamUser: (id: string, body: UpdateUserInput) =>
       fetchClient(`/v1/platform/iam/users/${id}`, { method: "PATCH", body }),
 
+    deleteIamUser: (id: string, reason?: string) =>
+      fetchClient(`/v1/platform/iam/users/${id}`, {
+        method: "DELETE",
+        query: reason ? { reason } : undefined,
+      }),
+
+    disableIamUserMfa: (id: string, body: { reason?: string } = {}) =>
+      fetchClient(`/v1/platform/iam/users/${id}/mfa/disable`, { method: "PATCH", body }),
+
     resetIamUserPassword: (id: string, body: IamResetUserPasswordInput) =>
       fetchClient(`/v1/platform/iam/users/${id}/reset-password`, { method: "POST", body }),
 
