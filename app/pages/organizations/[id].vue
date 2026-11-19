@@ -45,13 +45,18 @@
 
           <AButton @click="openSubdomainModal">Đổi Subdomain</AButton>
 
-          <AButton
-            v-if="org?.dns_status && org.dns_status !== 'SYNCED'"
-            :loading="actionLoading"
-            @click="handleRetryDns"
+          <APopconfirm
+            v-if="needsCloudflareSubdomain"
+            :title="`Tạo lại subdomain '${org?.subdomain}' trên Cloudflare DNS?`"
+            ok-text="Tạo lại"
+            cancel-text="Hủy"
+            @confirm="handleRetryDns"
           >
-            Retry DNS
-          </AButton>
+            <AButton :loading="actionLoading">
+              <template #icon><Icon name="ant-design:cloud-sync-outlined" /></template>
+              Tạo lại Sub Cloudflare
+            </AButton>
+          </APopconfirm>
         </ASpace>
       </AFlex>
     </ACard>
@@ -205,6 +210,11 @@
           <AEmpty v-else description="Chưa có dữ liệu Entitlements" />
         </ASpin>
       </div>
+
+      <!-- Tab 4: Media & Lưu trữ -->
+      <div v-else-if="activeTab === 'media'" class="mt-3">
+        <OrgMediaTab :org-id="orgId" />
+      </div>
     </ACard>
 
     <!-- Modal Đổi trạng thái Tổ chức -->
@@ -288,6 +298,7 @@
 <script setup lang="ts">
 import { message } from "antdv-next";
 import type { DescriptionsItemType, TableProps, TabsProps } from "antdv-next";
+import OrgMediaTab from "~/components/Organizations/OrgMediaTab.vue";
 import { useBillingApi } from "~/composables/api/useBillingApi";
 import { useTenantApi } from "~/composables/api/useTenantApi";
 import type {
@@ -313,11 +324,12 @@ const tenantApi = useTenantApi();
 const billingApi = useBillingApi();
 const { extractApiData, handleApiError } = useApiError();
 
-const activeTab = ref<"overview" | "subscriptions" | "entitlements">("overview");
+const activeTab = ref<"overview" | "subscriptions" | "entitlements" | "media">("overview");
 const tabItems: TabsProps["items"] = [
   { key: "overview", label: "Tổng quan & DNS" },
   { key: "subscriptions", label: "Gói dịch vụ (Subscriptions)" },
   { key: "entitlements", label: "Quyền lợi hiệu lực (Entitlements)" },
+  { key: "media", label: "Media & Lưu trữ" },
 ];
 
 const loading = ref(false);
@@ -496,13 +508,21 @@ const handleRetryDns = async () => {
   actionLoading.value = true;
   try {
     const { data, error } = await tenantApi.retryOrganizationDns(orgId.value);
-    if (handleApiError(data, error, "Thử lại đồng bộ DNS thất bại!")) return;
-    message.success("Đã gửi yêu cầu đồng bộ lại DNS!");
+    if (handleApiError(data, error, "Tạo lại subdomain trên Cloudflare DNS thất bại!")) return;
+    message.success("Đã tạo lại bản ghi subdomain trên Cloudflare!");
     await loadOrg();
   } finally {
     actionLoading.value = false;
   }
 };
+
+const needsCloudflareSubdomain = computed(() =>
+  Boolean(
+    org.value?.id &&
+      org.value?.subdomain &&
+      (!org.value.cloudflare_dns_record_id || !["SYNCED", "ACTIVE"].includes(org.value.dns_status || "")),
+  ),
+);
 
 const handleDeleteHistoryDns = async (record: OrganizationSubdomainHistory) => {
   if (!record.id) return;

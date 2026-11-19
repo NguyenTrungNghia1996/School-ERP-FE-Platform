@@ -26,6 +26,18 @@
             Làm mới
           </AButton>
 
+          <APopconfirm
+            title="Đồng bộ các subdomain đang tồn tại trên Cloudflare DNS vào danh sách giữ chỗ?"
+            ok-text="Đồng bộ"
+            cancel-text="Hủy"
+            @confirm="handleSyncCloudflare"
+          >
+            <AButton :loading="syncingCloudflare">
+              <template #icon><Icon name="ant-design:cloud-sync-outlined" /></template>
+              Đồng bộ Cloudflare DNS
+            </AButton>
+          </APopconfirm>
+
           <AButton type="primary" @click="openModal">
             <template #icon><Icon name="ant-design:plus-outlined" /></template>
             Thêm từ khóa
@@ -109,7 +121,7 @@ useHead({
   title: "Subdomain giữ chỗ | School ERP",
 });
 
-const { platformReservedSubdomains, publicTenantResolve } = useApi();
+const { platformReservedSubdomains, platformReservedSubdomainsSyncCloudflare, publicTenantResolve } = useApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const {
@@ -156,6 +168,22 @@ const columns: TableProps["columns"] = [
   { title: "Người tạo", dataIndex: "created_by", key: "created_by", width: 200 },
   { title: "Ngày tạo", key: "created_at", width: 180 },
 ];
+
+// Sync Cloudflare DNS
+const syncingCloudflare = ref(false);
+
+const handleSyncCloudflare = async () => {
+  syncingCloudflare.value = true;
+  try {
+    const { data, error } = await platformReservedSubdomainsSyncCloudflare.post(undefined);
+    if (handleApiError(data, error, "Đồng bộ từ Cloudflare DNS thất bại!")) return;
+
+    message.success(unref(data)?.message || "Đã đồng bộ subdomain từ Cloudflare DNS!");
+    await refresh();
+  } finally {
+    syncingCloudflare.value = false;
+  }
+};
 
 // Create
 const modalOpen = ref(false);

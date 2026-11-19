@@ -87,8 +87,12 @@
 
             <template v-else-if="column.key === 'subdomain'">
               <div class="font-mono text-xs text-slate-800">{{ record.subdomain || "—" }}</div>
-              <ATag v-if="record.dns_status" :color="dnsColor(record.dns_status)" class="mt-1 text-[10px]">
-                DNS: {{ record.dns_status }}
+              <ATag
+                v-if="record.dns_status || !record.cloudflare_dns_record_id"
+                :color="dnsColor(record.dns_status)"
+                class="mt-1 text-[10px]"
+              >
+                DNS: {{ record.dns_status || "CHƯA TẠO" }}
               </ATag>
             </template>
 
@@ -111,10 +115,25 @@
             </template>
 
             <template v-else-if="column.key === 'actions'">
-              <AButton size="small" type="primary" ghost @click="navigateTo(`/organizations/${record.id}`)">
-                <template #icon><Icon name="ant-design:eye-outlined" /></template>
-                Chi tiết
-              </AButton>
+              <ASpace size="small">
+                <APopconfirm
+                  v-if="needsCloudflareSubdomain(record)"
+                  :title="`Tạo lại subdomain '${record.subdomain}' trên Cloudflare DNS?`"
+                  ok-text="Tạo lại"
+                  cancel-text="Hủy"
+                  @confirm="handleRetryDns(record)"
+                >
+                  <AButton size="small" :loading="retryingOrgId === record.id">
+                    <template #icon><Icon name="ant-design:cloud-sync-outlined" /></template>
+                    Tạo lại Sub
+                  </AButton>
+                </APopconfirm>
+
+                <AButton size="small" type="primary" ghost @click="navigateTo(`/organizations/${record.id}`)">
+                  <template #icon><Icon name="ant-design:eye-outlined" /></template>
+                  Chi tiết
+                </AButton>
+              </ASpace>
             </template>
           </template>
         </ATable>
@@ -242,6 +261,7 @@
 <script setup lang="ts">
 import { message } from "antdv-next";
 import type { FormInstance, Rule, TableProps } from "antdv-next";
+import { useTenantApi } from "~/composables/api/useTenantApi";
 import type { OrganizationSummary } from "~/types/api/tenant";
 
 definePageMeta({
@@ -253,6 +273,7 @@ useHead({
 });
 
 const { platformOrganizations, platformOrganizationsCheckSubdomain } = useApi();
+const tenantApi = useTenantApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const searchInput = ref("");
@@ -344,8 +365,31 @@ const columns: TableProps["columns"] = [
   { title: "Gói chính", key: "package", width: 190 },
   { title: "Số trường", key: "school_count", width: 110, align: "center" },
   { title: "Trạng thái", key: "status", width: 120, align: "center" },
-  { title: "Thao tác", key: "actions", width: 110, fixed: "right" },
+  { title: "Thao tác", key: "actions", width: 220, fixed: "right" },
 ];
+
+const retryingOrgId = ref<string | null>(null);
+
+const needsCloudflareSubdomain = (org?: OrganizationSummary) =>
+  Boolean(
+    org?.id &&
+      org?.subdomain &&
+      (!org.cloudflare_dns_record_id || !["SYNCED", "ACTIVE"].includes(org.dns_status || "")),
+  );
+
+const handleRetryDns = async (record: OrganizationSummary) => {
+  if (!record.id) return;
+  retryingOrgId.value = record.id;
+  try {
+    const { data, error } = await tenantApi.retryOrganizationDns(record.id);
+    if (handleApiError(data, error, "Tạo lại subdomain trên Cloudflare DNS thất bại!")) return;
+
+    message.success((unref(data) as { message?: string } | null)?.message || "Đã tạo lại bản ghi subdomain trên Cloudflare!");
+    await refresh();
+  } finally {
+    retryingOrgId.value = null;
+  }
+};
 
 const handleSearch = () => {
   filters.search = searchInput.value.trim();
