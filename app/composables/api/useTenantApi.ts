@@ -12,6 +12,18 @@ export const useTenantApi = () => {
     updateOrganization: (id: string, body: UpdateOrganizationInput) =>
       fetchClient(`/v1/platform/organizations/${id}`, { method: "PATCH", body }),
 
+    deleteOrganization: (id: string, reason?: string) =>
+      fetchClient(`/v1/platform/organizations/${id}`, {
+        method: "DELETE",
+        query: reason ? { reason } : undefined,
+      }),
+
+    getOrganizationSchools: (id: string) =>
+      fetchClient(`/v1/platform/organizations/${id}/schools`, { method: "GET" }),
+
+    deleteReservedSubdomain: (keyword: string) =>
+      fetchClient(`/v1/platform/reserved-subdomains/${encodeURIComponent(keyword)}`, { method: "DELETE" }),
+
     approveOrganization: (id: string) =>
       fetchClient(`/v1/platform/organizations/${id}/approve`, { method: "POST" }),
 

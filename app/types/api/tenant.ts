@@ -97,3 +97,51 @@ export interface UpdateOrganizationInput {
   tax_code?: string;
   address?: string;
 }
+
+/** Trường học thuộc Tổ chức GET /v1/platform/organizations/{id}/schools (tenant_mgmt.School) */
+export interface TenantSchool {
+  id?: string;
+  organization_id?: string;
+  code?: string;
+  name?: string;
+  level?: string;
+  logo_url?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  is_main?: boolean;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/** Thống kê tổng quan Dashboard GET /v1/platform/dashboard/stats (tenant_mgmt.DashboardStatsOutput) */
+export interface DashboardStatsOutput {
+  organizations?: {
+    total?: number;
+    active?: number;
+    pending_approval?: number;
+    suspended?: number;
+    archived?: number;
+    dns_failed?: number;
+    dns_provisioning?: number;
+  };
+  schools_total?: number;
+  platform_users?: {
+    total?: number;
+    active?: number;
+  };
+  subscriptions?: {
+    active?: number;
+    expired?: number;
+    expiring_soon_30d?: number;
+  };
+  support_sessions?: {
+    active?: number;
+    pending?: number;
+  };
+  storage?: {
+    total_files?: number;
+    total_used_bytes?: number;
+  };
+}

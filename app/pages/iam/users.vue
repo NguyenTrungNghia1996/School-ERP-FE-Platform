@@ -120,6 +120,12 @@
                     <template #icon><Icon name="ant-design:safety-certificate-outlined" /></template>
                   </AButton>
                 </ATooltip>
+
+                <ATooltip v-if="record.id && record.id !== currentUser?.id" title="Xóa mềm nhân sự">
+                  <AButton size="small" danger @click="openDeleteUserModal(record)">
+                    <template #icon><Icon name="ant-design:delete-outlined" /></template>
+                  </AButton>
+                </ATooltip>
               </ASpace>
             </template>
           </template>
@@ -258,6 +264,29 @@
       <AForm layout="vertical">
         <AFormItem label="Lý do (tùy chọn)">
           <ATextarea v-model:value="mfaReason" :rows="3" placeholder="Ví dụ: Nhân sự bị mất thiết bị Authenticator" />
+        </AFormItem>
+      </AForm>
+    </AModal>
+
+    <!-- Modal Xóa mềm Nhân sự (DELETE /v1/platform/iam/users/{id}) -->
+    <AModal
+      v-model:open="deleteOpen"
+      :title="`Xóa nhân sự — ${selectedUser?.full_name || selectedUser?.email || ''}`"
+      :confirm-loading="submitting"
+      ok-text="Xác nhận xóa"
+      :ok-button-props="{ danger: true }"
+      cancel-text="Hủy"
+      @ok="submitDeleteUser"
+    >
+      <AAlert
+        type="warning"
+        show-icon
+        class="mb-4"
+        title="Thao tác xóa mềm sẽ vô hiệu hóa tài khoản nhân sự này và dọn ảnh đại diện (nếu có)."
+      />
+      <AForm layout="vertical">
+        <AFormItem label="Lý do xóa (tùy chọn)">
+          <ATextarea v-model:value="deleteReason" :rows="3" placeholder="Nhân sự nghỉ việc / tạo nhầm" />
         </AFormItem>
       </AForm>
     </AModal>
@@ -620,7 +649,7 @@ const submitResetPassword = async () => {
   }
 };
 
-// --- Tắt MFA bắt buộc (PATCH /v1/platform/users/{id}/mfa/disable) ---
+// --- Tắt MFA bắt buộc (PATCH /v1/platform/iam/users/{id}/mfa/disable) ---
 const mfaOpen = ref(false);
 const mfaReason = ref("");
 
@@ -634,13 +663,43 @@ const submitDisableMfa = async () => {
   if (!selectedUser.value?.id) return;
   submitting.value = true;
   try {
-    const body: Record<string, string> = mfaReason.value.trim()
-      ? { reason: mfaReason.value.trim() }
-      : {};
-    const { data, error } = await iamApi.disableUserMfa(selectedUser.value.id, body);
+    const body = mfaReason.value.trim() ? { reason: mfaReason.value.trim() } : {};
+    const { data, error } = await iamApi.disableIamUserMfa(selectedUser.value.id, body);
     if (handleApiError(data, error, "Tắt MFA cho nhân sự thất bại!")) return;
     message.success(unref(data)?.message || "Đã tắt MFA cho nhân sự!");
     mfaOpen.value = false;
+    await refresh();
+  } finally {
+    submitting.value = false;
+  }
+};
+
+// --- Xóa mềm nhân sự (DELETE /v1/platform/iam/users/{id}) ---
+const deleteOpen = ref(false);
+const deleteReason = ref("");
+
+const openDeleteUserModal = (record: PlatformUser) => {
+  selectedUser.value = record;
+  deleteReason.value = "";
+  deleteOpen.value = true;
+};
+
+const submitDeleteUser = async () => {
+  if (!selectedUser.value?.id) return;
+  const avatarToDelete = selectedUser.value.avatar_url;
+  submitting.value = true;
+  try {
+    const { data, error } = await iamApi.deleteIamUser(
+      selectedUser.value.id,
+      deleteReason.value.trim() || undefined,
+    );
+    if (handleApiError(data, error, "Xóa nhân sự thất bại!")) return;
+
+    if (avatarToDelete) {
+      await mediaApi.deleteMediaByUrl(avatarToDelete).catch(() => {});
+    }
+    message.success(unref(data)?.message || "Đã xóa nhân sự!");
+    deleteOpen.value = false;
     await refresh();
   } finally {
     submitting.value = false;

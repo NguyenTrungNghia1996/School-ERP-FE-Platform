@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <!-- Header Card -->
-    <ACard class="!rounded-xl !border-slate-200/80 shadow-xs">
+    <ACard class="shadow-xs !rounded-xl !border-slate-200/80">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center gap-4">
           <AAvatar :size="64" :src="user?.avatar_url || undefined" class="bg-blue-600 text-white">
@@ -46,7 +46,7 @@
     </ACard>
 
     <!-- Main Content Tabs -->
-    <ACard class="!rounded-xl !border-slate-200/80 shadow-xs">
+    <ACard class="shadow-xs !rounded-xl !border-slate-200/80">
       <ATabs v-model:activeKey="activeTab" :items="tabItems" @change="handleTabChange" />
 
       <!-- Tab 1: Thông tin tài khoản -->
@@ -55,9 +55,7 @@
 
         <div>
           <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-semibold text-slate-700">
-              Danh sách quyền hiệu lực ({{ permissions.length }})
-            </span>
+            <span class="text-sm font-semibold text-slate-700">Danh sách quyền hiệu lực ({{ permissions.length }})</span>
           </div>
           <div v-if="permissions.length" class="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-slate-200/80 bg-slate-50/70 p-3">
             <ATag v-for="perm in permissions" :key="perm" class="font-mono text-xs">
@@ -70,12 +68,7 @@
 
       <!-- Tab 2: Đổi mật khẩu -->
       <div v-else-if="activeTab === 'password'" class="mt-2 max-w-lg">
-        <AAlert
-          type="info"
-          show-icon
-          class="mb-5"
-          title="Mật khẩu mới nên có ít nhất 8 ký tự, kết hợp chữ hoa, chữ thường, số và ký tự đặc biệt."
-        />
+        <AAlert type="info" show-icon class="mb-5" title="Mật khẩu mới nên có ít nhất 8 ký tự, kết hợp chữ hoa, chữ thường, số và ký tự đặc biệt." />
         <ProfileChangePasswordForm @success="handleRefreshProfile" />
       </div>
 
@@ -83,11 +76,7 @@
       <div v-else-if="activeTab === 'mfa'" class="mt-2 max-w-xl space-y-5">
         <!-- MFA đang tắt -> Thiết lập & Kích hoạt -->
         <template v-if="!user?.mfa_enabled">
-          <AAlert
-            type="warning"
-            show-icon
-            title="Tài khoản hiện chưa bật xác thực 2 lớp (MFA / TOTP). Hãy kích hoạt để tăng cường bảo mật."
-          />
+          <AAlert type="warning" show-icon title="Tài khoản hiện chưa bật xác thực 2 lớp (MFA / TOTP). Hãy kích hoạt để tăng cường bảo mật." />
 
           <div v-if="!mfaSetup">
             <AButton type="primary" :loading="mfaLoading" @click="handleSetupMfa">
@@ -102,12 +91,7 @@
             <div class="flex flex-col gap-5 sm:flex-row sm:items-start">
               <div class="flex flex-col items-center rounded-xl border border-slate-200 bg-white p-3">
                 <ClientOnly>
-                  <AQrcode
-                    v-if="mfaSetup.otpauth_url"
-                    :value="mfaSetup.otpauth_url"
-                    :size="176"
-                    :bordered="false"
-                  />
+                  <AQrcode v-if="mfaSetup.otpauth_url" :value="mfaSetup.otpauth_url" :size="176" :bordered="false" />
                 </ClientOnly>
                 <span class="mt-2 text-[11px] text-slate-400">Quét bằng Google Authenticator</span>
               </div>
@@ -147,19 +131,10 @@
                 :rules="[
                   { required: true, message: 'Vui lòng nhập mã OTP' },
                   { len: 6, message: 'Mã OTP gồm đúng 6 chữ số' },
-                ]"
-              >
+                ]">
                 <div class="flex flex-wrap items-center gap-3">
-                  <AInput
-                    v-model:value="mfaForm.otp_code"
-                    :maxlength="6"
-                    placeholder="123456"
-                    class="!w-48 font-mono tracking-widest"
-                    size="large"
-                  />
-                  <AButton type="primary" html-type="submit" size="large" :loading="mfaLoading">
-                    Kích hoạt MFA
-                  </AButton>
+                  <AInput v-model:value="mfaForm.otp_code" :maxlength="6" placeholder="123456" class="!w-48 font-mono tracking-widest" size="large" />
+                  <AButton type="primary" html-type="submit" size="large" :loading="mfaLoading">Kích hoạt MFA</AButton>
                   <AButton size="large" @click="mfaSetup = null">Hủy</AButton>
                 </div>
               </AFormItem>
@@ -169,17 +144,11 @@
 
         <!-- MFA đang bật -> Tắt MFA -->
         <template v-else>
-          <AAlert
-            type="success"
-            show-icon
-            title="Xác thực 2 lớp (MFA / TOTP) đang được kích hoạt trên tài khoản của bạn."
-          />
+          <AAlert type="success" show-icon title="Xác thực 2 lớp (MFA / TOTP) đang được kích hoạt trên tài khoản của bạn." />
 
           <div class="rounded-xl border border-red-200/80 bg-red-50/40 p-4">
             <div class="mb-2 font-semibold text-red-700">Tắt bảo mật 2 lớp (MFA)</div>
-            <p class="mb-4 text-xs text-slate-600">
-              Nhập mã OTP hiện tại từ ứng dụng Authenticator để xác nhận tắt MFA.
-            </p>
+            <p class="mb-4 text-xs text-slate-600">Nhập mã OTP hiện tại từ ứng dụng Authenticator để xác nhận tắt MFA.</p>
             <AForm layout="vertical" :model="mfaForm" @finish="handleDisableMfa">
               <AFormItem
                 label="Mã xác thực OTP"
@@ -187,36 +156,25 @@
                 :rules="[
                   { required: true, message: 'Vui lòng nhập mã OTP' },
                   { len: 6, message: 'Mã OTP gồm đúng 6 chữ số' },
-                ]"
-              >
+                ]">
                 <div class="flex flex-wrap items-center gap-3">
-                  <AInput
-                    v-model:value="mfaForm.otp_code"
-                    :maxlength="6"
-                    placeholder="123456"
-                    class="!w-48 font-mono tracking-widest"
-                    size="large"
-                  />
-                  <AButton danger type="primary" html-type="submit" size="large" :loading="mfaLoading">
-                    Xác nhận tắt MFA
-                  </AButton>
+                  <AInput v-model:value="mfaForm.otp_code" :maxlength="6" placeholder="123456" class="!w-48 font-mono tracking-widest" size="large" />
+                  <AButton danger type="primary" html-type="submit" size="large" :loading="mfaLoading">Xác nhận tắt MFA</AButton>
                 </div>
               </AFormItem>
             </AForm>
           </div>
         </template>
       </div>
+
+      <!-- Tab 4: Thư viện Media cấp Platform (/v1/platform/media*) -->
+      <div v-else-if="activeTab === 'media'" class="mt-2">
+        <OrgMediaTab />
+      </div>
     </ACard>
 
     <!-- Modal Chỉnh sửa hồ sơ & Avatar (PATCH /v1/platform/me) -->
-    <AModal
-      v-model:open="editOpen"
-      title="Chỉnh sửa hồ sơ cá nhân"
-      :confirm-loading="savingProfile"
-      ok-text="Lưu thay đổi"
-      cancel-text="Hủy"
-      @ok="submitEditProfile"
-    >
+    <AModal v-model:open="editOpen" title="Chỉnh sửa hồ sơ cá nhân" :confirm-loading="savingProfile" ok-text="Lưu thay đổi" cancel-text="Hủy" @ok="submitEditProfile">
       <AForm ref="editFormRef" :model="editForm" :rules="editRules" layout="vertical" class="mt-3">
         <AFormItem label="Ảnh đại diện (Avatar)">
           <ImageUploadField v-model="editForm.avatar_url" v-model:file="editAvatarFile" round />
@@ -237,6 +195,7 @@ import { h } from "vue";
 import { Tag, message } from "antdv-next";
 import type { DescriptionsItemType, FormInstance, Rule, TabsProps } from "antdv-next";
 import ImageUploadField from "~/components/Base/ImageUploadField.vue";
+import OrgMediaTab from "~/components/Organizations/OrgMediaTab.vue";
 import { useMediaApi } from "~/composables/api/useMediaApi";
 import type { MFASetupOutput } from "~/types/api/auth";
 
@@ -251,7 +210,7 @@ const mediaApi = useMediaApi();
 const { platformMeMfaSetup, platformMeMfaEnable, platformMeMfaDisable } = useApi();
 const { extractApiData, handleApiError } = useApiError();
 
-const VALID_TABS = ["info", "password", "mfa"] as const;
+const VALID_TABS = ["info", "password", "mfa", "media"] as const;
 type TabKey = (typeof VALID_TABS)[number];
 
 const resolveTabFromQuery = (): TabKey => {
@@ -276,6 +235,7 @@ const tabItems: TabsProps["items"] = [
   { key: "info", label: "Thông tin tài khoản" },
   { key: "password", label: "Đổi mật khẩu" },
   { key: "mfa", label: "Bảo mật 2 lớp (MFA)" },
+  { key: "media", label: "Thư viện Media" },
 ];
 
 const formatDateTime = (val?: string) => {
@@ -291,22 +251,12 @@ const profileItems = computed<DescriptionsItemType[]>(() => [
   {
     key: "status",
     label: "Trạng thái",
-    content: () =>
-      h(
-        Tag,
-        { color: user.value?.status === "ACTIVE" ? "success" : "default" },
-        () => user.value?.status || "—",
-      ),
+    content: () => h(Tag, { color: user.value?.status === "ACTIVE" ? "success" : "default" }, () => user.value?.status || "—"),
   },
   {
     key: "mfa",
     label: "Xác thực 2 lớp (MFA)",
-    content: () =>
-      h(
-        Tag,
-        { color: user.value?.mfa_enabled ? "green" : "default" },
-        () => (user.value?.mfa_enabled ? "Đã bật" : "Chưa bật"),
-      ),
+    content: () => h(Tag, { color: user.value?.mfa_enabled ? "green" : "default" }, () => (user.value?.mfa_enabled ? "Đã bật" : "Chưa bật")),
   },
   { key: "last_login_at", label: "Đăng nhập gần nhất", content: formatDateTime(user.value?.last_login_at) },
   { key: "created_at", label: "Ngày tạo tài khoản", content: formatDateTime(user.value?.created_at) },
@@ -362,7 +312,7 @@ const submitEditProfile = async () => {
       previousUrl: user.value?.avatar_url,
       folder: "avatars",
       errorMessage: "Cập nhật hồ sơ thất bại!",
-      saveFn: (finalUrl) =>
+      saveFn: finalUrl =>
         updateMe({
           full_name: editForm.full_name.trim(),
           phone: editForm.phone.trim() || undefined,

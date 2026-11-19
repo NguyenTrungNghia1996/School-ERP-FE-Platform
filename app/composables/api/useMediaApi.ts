@@ -15,6 +15,9 @@ export const useMediaApi = () => {
   const { fetchClient } = useRequest();
   const { extractApiData, handleApiError } = useApiError();
 
+  const mediaBase = (orgId?: string) =>
+    orgId ? `/v1/platform/organizations/${orgId}/media` : `/v1/platform/media`;
+
   const buildUploadFormData = (input: MediaUploadInput | PlatformMediaUploadInput): FormData => {
     const formData = new FormData();
     formData.append("file", input.file);
@@ -25,27 +28,31 @@ export const useMediaApi = () => {
     return formData;
   };
 
-  // --- Platform-level Media (không gắn org_id) ---
-  const uploadPlatformMedia = (input: PlatformMediaUploadInput) =>
-    fetchClient("/v1/platform/media/upload", {
+  const uploadMedia = (input: MediaUploadInput | PlatformMediaUploadInput, orgId?: string) =>
+    fetchClient(`${mediaBase(orgId)}/upload`, {
       method: "POST",
       body: buildUploadFormData(input),
     });
 
-  const listPlatformMedia = (query?: MediaListParams) =>
-    fetchClient("/v1/platform/media", { method: "GET", query });
+  const listMedia = (query?: MediaListParams, orgId?: string) =>
+    fetchClient(mediaBase(orgId), { method: "GET", query });
+
+  const listMediaTrash = (query?: MediaTrashParams, orgId?: string) =>
+    fetchClient(`${mediaBase(orgId)}/trash`, { method: "GET", query });
+
+  const getMediaUrl = (fileId: string, orgId?: string) =>
+    fetchClient(`${mediaBase(orgId)}/${fileId}/url`, { method: "GET" });
+
+  const restoreMedia = (fileId: string, orgId?: string) =>
+    fetchClient(`${mediaBase(orgId)}/${fileId}/restore`, { method: "POST" });
+
+  const permanentDeleteMedia = (fileId: string, orgId?: string) =>
+    fetchClient(`${mediaBase(orgId)}/${fileId}/permanent`, { method: "DELETE" });
 
   const deletePlatformMediaByUrl = (access_url: string) =>
     fetchClient("/v1/platform/media/by-url", {
       method: "DELETE",
       body: { access_url },
-    });
-
-  // --- Organization-scoped Media (/v1/platform/organizations/{org_id}/media*) ---
-  const uploadOrgMedia = (orgId: string, input: MediaUploadInput) =>
-    fetchClient(`/v1/platform/organizations/${orgId}/media/upload`, {
-      method: "POST",
-      body: buildUploadFormData(input),
     });
 
   const deleteOrgMediaByUrl = (orgId: string, access_url: string) =>
@@ -63,8 +70,8 @@ export const useMediaApi = () => {
   ) => {
     const res =
       typeof orgIdOrInput === "string"
-        ? await uploadOrgMedia(orgIdOrInput, maybeInput!)
-        : await uploadPlatformMedia(orgIdOrInput);
+        ? await uploadMedia(maybeInput!, orgIdOrInput)
+        : await uploadMedia(orgIdOrInput);
 
     const uploaded = extractApiData(res.data) as StoredFile | null;
     return {
@@ -132,32 +139,19 @@ export const useMediaApi = () => {
   };
 
   return {
-    uploadPlatformMedia,
-    listPlatformMedia,
-    deletePlatformMediaByUrl,
-    uploadOrgMedia,
+    listMedia,
+    listMediaTrash,
+    getMediaUrl,
+    restoreMedia,
+    permanentDeleteMedia,
+    uploadMedia,
     uploadAndGetUrl,
     deleteMediaByUrl,
+    deletePlatformMediaByUrl,
+    deleteOrgMediaByUrl,
     saveWithImageReplace,
-
-    listOrgMedia: (orgId: string, query?: MediaListParams) =>
-      fetchClient(`/v1/platform/organizations/${orgId}/media`, { method: "GET", query }),
-
-    getOrgMediaUrl: (orgId: string, fileId: string) =>
-      fetchClient(`/v1/platform/organizations/${orgId}/media/${fileId}/url`, { method: "GET" }),
 
     getOrgStorageUsage: (orgId: string) =>
       fetchClient(`/v1/platform/organizations/${orgId}/storage/usage`, { method: "GET" }),
-
-    deleteOrgMediaByUrl,
-
-    listOrgMediaTrash: (orgId: string, query?: MediaTrashParams) =>
-      fetchClient(`/v1/platform/organizations/${orgId}/media/trash`, { method: "GET", query }),
-
-    restoreOrgMedia: (orgId: string, fileId: string) =>
-      fetchClient(`/v1/platform/organizations/${orgId}/media/${fileId}/restore`, { method: "POST" }),
-
-    permanentDeleteOrgMedia: (orgId: string, fileId: string) =>
-      fetchClient(`/v1/platform/organizations/${orgId}/media/${fileId}/permanent`, { method: "DELETE" }),
   };
 };

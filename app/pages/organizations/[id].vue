@@ -65,6 +65,11 @@
               Tạo lại Sub Cloudflare
             </AButton>
           </APopconfirm>
+
+          <AButton danger @click="openDeleteOrgModal">
+            <template #icon><Icon name="ant-design:delete-outlined" /></template>
+            Xóa Tổ chức
+          </AButton>
         </ASpace>
       </AFlex>
     </ACard>
@@ -219,7 +224,46 @@
         </ASpin>
       </div>
 
-      <!-- Tab 4: Media & Lưu trữ -->
+      <!-- Tab 4: Trường học trực thuộc (GET /v1/platform/organizations/{id}/schools) -->
+      <div v-else-if="activeTab === 'schools'" class="mt-3">
+        <ClientOnly>
+          <ATable
+            :columns="schoolColumns"
+            :data-source="schools"
+            :loading="loadingSchools"
+            :pagination="false"
+            row-key="id"
+            size="small"
+            :scroll="{ x: 900 }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'name'">
+                <div class="flex items-center gap-2.5">
+                  <AAvatar :size="32" shape="square" :src="record.logo_url || undefined" class="shrink-0 bg-slate-100 text-slate-500">
+                    <template #icon><Icon name="ant-design:apartment-outlined" /></template>
+                  </AAvatar>
+                  <div>
+                    <div class="flex items-center gap-1.5 font-medium text-slate-800">
+                      <span>{{ record.name || "—" }}</span>
+                      <ATag v-if="record.is_main" color="blue" class="!m-0 text-[10px]">Trường chính</ATag>
+                    </div>
+                    <div class="font-mono text-xs text-slate-500">{{ record.code || "—" }}</div>
+                  </div>
+                </div>
+              </template>
+              <template v-else-if="column.key === 'contact'">
+                <div class="text-xs text-slate-700">{{ record.email || "—" }}</div>
+                <div class="text-xs text-slate-500">{{ record.phone || "—" }}</div>
+              </template>
+              <template v-else-if="column.key === 'status'">
+                <ATag :color="record.status === 'ACTIVE' ? 'success' : 'default'">{{ record.status || "—" }}</ATag>
+              </template>
+            </template>
+          </ATable>
+        </ClientOnly>
+      </div>
+
+      <!-- Tab 5: Media & Lưu trữ -->
       <div v-else-if="activeTab === 'media'" class="mt-3">
         <OrgMediaTab :org-id="orgId" />
       </div>
@@ -344,6 +388,29 @@
         </AFormItem>
       </AForm>
     </AModal>
+
+    <!-- Modal Xóa mềm Tổ chức (DELETE /v1/platform/organizations/{id}) -->
+    <AModal
+      v-model:open="deleteOrgModalOpen"
+      :title="`Xóa Tổ chức — ${org?.name || org?.code || ''}`"
+      :confirm-loading="actionLoading"
+      ok-text="Xác nhận xóa"
+      :ok-button-props="{ danger: true }"
+      cancel-text="Hủy"
+      @ok="submitDeleteOrg"
+    >
+      <AAlert
+        type="warning"
+        show-icon
+        class="mb-4"
+        title="Thao tác xóa mềm sẽ dọn DNS Cloudflare, thu hồi các phiên hỗ trợ, xóa cache Redis và gỡ logo Tổ chức."
+      />
+      <AForm layout="vertical">
+        <AFormItem label="Lý do xóa (tùy chọn)">
+          <ATextarea v-model:value="deleteOrgReason" :rows="3" placeholder="Tổ chức ngừng sử dụng hoặc tạo nhầm" />
+        </AFormItem>
+      </AForm>
+    </AModal>
   </div>
 </template>
 
@@ -360,7 +427,7 @@ import type {
   OrganizationSubscription,
   ServicePackageWithSummary,
 } from "~/types/api/billing";
-import type { Organization, OrganizationSubdomainHistory } from "~/types/api/tenant";
+import type { Organization, OrganizationSubdomainHistory, TenantSchool } from "~/types/api/tenant";
 
 definePageMeta({
   middleware: ["permission"],
@@ -379,20 +446,23 @@ const billingApi = useBillingApi();
 const mediaApi = useMediaApi();
 const { extractApiData, handleApiError } = useApiError();
 
-const activeTab = ref<"overview" | "subscriptions" | "entitlements" | "media">("overview");
+const activeTab = ref<"overview" | "schools" | "subscriptions" | "entitlements" | "media">("overview");
 const tabItems: TabsProps["items"] = [
   { key: "overview", label: "Tổng quan & DNS" },
+  { key: "schools", label: "Trường học trực thuộc" },
   { key: "subscriptions", label: "Gói dịch vụ (Subscriptions)" },
   { key: "entitlements", label: "Quyền lợi hiệu lực (Entitlements)" },
   { key: "media", label: "Media & Lưu trữ" },
 ];
 
 const loading = ref(false);
+const loadingSchools = ref(false);
 const loadingSubs = ref(false);
 const loadingEntitlements = ref(false);
 const actionLoading = ref(false);
 
 const org = ref<Organization | null>(null);
+const schools = ref<TenantSchool[]>([]);
 const subscriptions = ref<OrganizationSubscription[]>([]);
 const entitlements = ref<OrganizationEntitlement | null>(null);
 
@@ -433,8 +503,21 @@ const loadEntitlements = async () => {
   }
 };
 
+const loadSchools = async () => {
+  if (!orgId.value) return;
+  loadingSchools.value = true;
+  try {
+    const { data, error } = await tenantApi.getOrganizationSchools(orgId.value);
+    if (handleApiError(data, error, "Không thể tải danh sách trường học!")) return;
+    const list = extractApiData(data);
+    schools.value = Array.isArray(list) ? (list as TenantSchool[]) : [];
+  } finally {
+    loadingSchools.value = false;
+  }
+};
+
 const loadAll = async () => {
-  await Promise.all([loadOrg(), loadSubscriptions(), loadEntitlements()]);
+  await Promise.all([loadOrg(), loadSchools(), loadSubscriptions(), loadEntitlements()]);
 };
 
 // Load packages để chọn version khi cấp gói
@@ -535,6 +618,14 @@ const historyColumns: TableProps["columns"] = [
   { title: "Chuyển đổi Subdomain", key: "redirect" },
   { title: "Lý do", dataIndex: "reason", key: "reason" },
   { title: "Thao tác", key: "actions", width: 130 },
+];
+
+const schoolColumns: TableProps["columns"] = [
+  { title: "Trường học", key: "name", width: 280 },
+  { title: "Cấp học", dataIndex: "level", key: "level", width: 130 },
+  { title: "Liên hệ", key: "contact", width: 220 },
+  { title: "Địa chỉ", dataIndex: "address", key: "address" },
+  { title: "Trạng thái", key: "status", width: 120, align: "center" },
 ];
 
 const subColumns: TableProps["columns"] = [
@@ -676,6 +767,36 @@ const submitEditOrg = async () => {
     message.success("Đã cập nhật thông tin Tổ chức!");
     editOrgModalOpen.value = false;
     await loadOrg();
+  } finally {
+    actionLoading.value = false;
+  }
+};
+
+const deleteOrgModalOpen = ref(false);
+const deleteOrgReason = ref("");
+
+const openDeleteOrgModal = () => {
+  deleteOrgReason.value = "";
+  deleteOrgModalOpen.value = true;
+};
+
+const submitDeleteOrg = async () => {
+  if (!orgId.value) return;
+  const logoToDelete = org.value?.logo_url;
+  actionLoading.value = true;
+  try {
+    const { data, error } = await tenantApi.deleteOrganization(
+      orgId.value,
+      deleteOrgReason.value.trim() || undefined,
+    );
+    if (handleApiError(data, error, "Xóa Tổ chức thất bại!")) return;
+
+    if (logoToDelete) {
+      await mediaApi.deleteMediaByUrl(logoToDelete, orgId.value).catch(() => {});
+    }
+    message.success((unref(data) as { message?: string } | null)?.message || "Đã xóa Tổ chức!");
+    deleteOrgModalOpen.value = false;
+    await navigateTo("/organizations");
   } finally {
     actionLoading.value = false;
   }

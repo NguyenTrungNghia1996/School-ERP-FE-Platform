@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-4">
     <!-- Thống kê dung lượng lưu trữ (GET /v1/platform/organizations/{org_id}/storage/usage) -->
-    <div class="rounded-lg border border-slate-200/80 bg-slate-50/70 p-4">
+    <div v-if="orgId" class="rounded-lg border border-slate-200/80 bg-slate-50/70 p-4">
       <AFlex justify="space-between" align="center" wrap="wrap" gap="middle">
         <div class="space-y-1">
           <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -219,7 +219,7 @@
           </div>
         </AFormItem>
 
-        <AFormItem label="School ID (tùy chọn, nếu tách theo trường)">
+        <AFormItem v-if="orgId" label="School ID (tùy chọn, nếu tách theo trường)">
           <AInput v-model:value="uploadForm.school_id" placeholder="UUID trường học" class="font-mono" />
         </AFormItem>
 
@@ -276,14 +276,16 @@ import { useMediaApi } from "~/composables/api/useMediaApi";
 import type { MediaFileURLOutput, StorageUsageOutput, StoredFile } from "~/types/api/media";
 
 const props = defineProps<{
-  orgId: string;
+  orgId?: string;
 }>();
 
 const mediaApi = useMediaApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
-const folderPresets = ["logos", "avatars", "documents", "students"];
+const folderPresets = computed(() =>
+  props.orgId ? ["logos", "avatars", "documents", "students"] : ["avatars", "branding", "docs", "general"],
+);
 
 const viewMode = ref<"active" | "trash">("active");
 const folderFilter = ref("");
@@ -320,24 +322,29 @@ const columns: TableProps["columns"] = [
 ];
 
 const loadUsage = async () => {
-  if (!props.orgId) return;
+  if (!props.orgId) {
+    usage.value = null;
+    return;
+  }
   const { data, error } = await mediaApi.getOrgStorageUsage(props.orgId);
   if (handleApiError(data, error, "Không thể tải thông tin dung lượng lưu trữ!")) return;
   usage.value = (extractApiData(data) as StorageUsageOutput) ?? null;
 };
 
 const loadList = async () => {
-  if (!props.orgId) return;
   loading.value = true;
   try {
     const query = { page: pagination.page, limit: pagination.limit };
     const { data, error } =
       viewMode.value === "active"
-        ? await mediaApi.listOrgMedia(props.orgId, {
-            ...query,
-            folder: folderFilter.value.trim() || undefined,
-          })
-        : await mediaApi.listOrgMediaTrash(props.orgId, query);
+        ? await mediaApi.listMedia(
+            {
+              ...query,
+              folder: folderFilter.value.trim() || undefined,
+            },
+            props.orgId || undefined,
+          )
+        : await mediaApi.listMediaTrash(query, props.orgId || undefined);
 
     if (handleApiError(data, error, "Không thể tải danh sách tệp media!")) return;
 
@@ -356,8 +363,9 @@ const loadAll = async () => {
 
 watch(
   () => props.orgId,
-  (id) => {
-    if (id) loadAll();
+  () => {
+    pagination.page = 1;
+    loadAll();
   },
   { immediate: true },
 );
@@ -411,11 +419,14 @@ const submitUpload = async () => {
 
   uploading.value = true;
   try {
-    const { accessUrl, data, error } = await mediaApi.uploadAndGetUrl(props.orgId, {
+    const uploadInput = {
       file: uploadForm.file,
       folder: uploadForm.folder,
-      school_id: uploadForm.school_id,
-    });
+      ...(props.orgId ? { school_id: uploadForm.school_id } : {}),
+    };
+    const { accessUrl, data, error } = props.orgId
+      ? await mediaApi.uploadAndGetUrl(props.orgId, uploadInput)
+      : await mediaApi.uploadAndGetUrl(uploadInput);
     if (handleApiError(data, error, "Tải tệp lên thất bại!")) return;
 
     lastUploadedUrl.value = accessUrl;
@@ -432,7 +443,7 @@ const handleFetchAccessUrl = async (record: StoredFile) => {
   if (!record.id) return;
   rowActionId.value = record.id;
   try {
-    const { data, error } = await mediaApi.getOrgMediaUrl(props.orgId, record.id);
+    const { data, error } = await mediaApi.getMediaUrl(record.id, props.orgId || undefined);
     if (handleApiError(data, error, "Không thể lấy đường dẫn truy cập tệp!")) return;
     selectedFileUrl.value = (extractApiData(data) as MediaFileURLOutput) ?? null;
     urlModalOpen.value = true;
@@ -448,7 +459,7 @@ const handleSoftDelete = async (record: StoredFile) => {
   }
   rowActionId.value = record.id || null;
   try {
-    const { data, error } = await mediaApi.deleteOrgMediaByUrl(props.orgId, record.access_url);
+    const { data, error } = await mediaApi.deleteMediaByUrl(record.access_url, props.orgId || undefined);
     if (handleApiError(data, error, "Xóa tệp thất bại!")) return;
     message.success("Đã chuyển tệp vào thùng rác!");
     await loadAll();
@@ -461,7 +472,7 @@ const handleRestore = async (record: StoredFile) => {
   if (!record.id) return;
   rowActionId.value = record.id;
   try {
-    const { data, error } = await mediaApi.restoreOrgMedia(props.orgId, record.id);
+    const { data, error } = await mediaApi.restoreMedia(record.id, props.orgId || undefined);
     if (handleApiError(data, error, "Khôi phục tệp thất bại!")) return;
     message.success("Đã khôi phục tệp!");
     await loadAll();
@@ -474,7 +485,7 @@ const handlePermanentDelete = async (record: StoredFile) => {
   if (!record.id) return;
   rowActionId.value = record.id;
   try {
-    const { data, error } = await mediaApi.permanentDeleteOrgMedia(props.orgId, record.id);
+    const { data, error } = await mediaApi.permanentDeleteMedia(record.id, props.orgId || undefined);
     if (handleApiError(data, error, "Xóa vĩnh viễn tệp thất bại!")) return;
     message.success("Đã xóa vĩnh viễn tệp khỏi R2/S3!");
     await loadAll();

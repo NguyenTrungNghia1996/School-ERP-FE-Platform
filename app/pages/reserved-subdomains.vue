@@ -83,6 +83,17 @@
             <template v-else-if="column.key === 'created_at'">
               <span class="text-xs text-slate-600">{{ formatDateTime(record.created_at) }}</span>
             </template>
+            <template v-else-if="column.key === 'actions'">
+              <APopconfirm
+                v-if="record.keyword"
+                :title="`Gỡ từ khóa '${record.keyword}' khỏi danh sách giữ chỗ?`"
+                ok-text="Gỡ"
+                cancel-text="Hủy"
+                @confirm="handleDeleteKeyword(record.keyword)"
+              >
+                <AButton size="small" danger :loading="deletingKeyword === record.keyword">Gỡ</AButton>
+              </APopconfirm>
+            </template>
           </template>
         </ATable>
       </ClientOnly>
@@ -111,6 +122,7 @@
 <script setup lang="ts">
 import { message } from "antdv-next";
 import type { FormInstance, Rule, TableProps } from "antdv-next";
+import { useTenantApi } from "~/composables/api/useTenantApi";
 import type { ReservedSubdomain } from "~/types/api/tenant";
 
 definePageMeta({
@@ -122,6 +134,7 @@ useHead({
 });
 
 const { platformReservedSubdomains, platformReservedSubdomainsSyncCloudflare, publicTenantResolve } = useApi();
+const tenantApi = useTenantApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const {
@@ -167,7 +180,21 @@ const columns: TableProps["columns"] = [
   { title: "Lý do giữ chỗ", dataIndex: "reason", key: "reason" },
   { title: "Người tạo", dataIndex: "created_by", key: "created_by", width: 200 },
   { title: "Ngày tạo", key: "created_at", width: 180 },
+  { title: "Thao tác", key: "actions", width: 100, align: "center" },
 ];
+
+const deletingKeyword = ref<string | null>(null);
+const handleDeleteKeyword = async (keyword: string) => {
+  deletingKeyword.value = keyword;
+  try {
+    const { data, error } = await tenantApi.deleteReservedSubdomain(keyword);
+    if (handleApiError(data, error, "Gỡ từ khóa thất bại!")) return;
+    message.success((unref(data) as { message?: string } | null)?.message || "Đã gỡ từ khóa khỏi danh sách giữ chỗ!");
+    await refresh();
+  } finally {
+    deletingKeyword.value = null;
+  }
+};
 
 // Sync Cloudflare DNS
 const syncingCloudflare = ref(false);
