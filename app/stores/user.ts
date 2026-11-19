@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { isTokenValid, performTokenRefresh, useAuthTokens } from "~/composables/useRequest";
-import type { AntDMenuNode, LoginInput, LoginOutput, MeProfile } from "~/types/api/auth";
+import type { AntDMenuNode, LoginInput, LoginOutput, MeProfile, UpdateMeInput } from "~/types/api/auth";
 
 export const useUserStore = defineStore("user", () => {
   const me = ref<MeProfile | null>(null);
@@ -77,6 +77,17 @@ export const useUserStore = defineStore("user", () => {
   };
 
   /**
+   * Cập nhật hồ sơ cá nhân qua PATCH /v1/platform/me
+   */
+  const updateMe = async (payload: UpdateMeInput) => {
+    const res = await platformMe.patch(payload);
+    if (!res.error.value) {
+      await fetchMe(true);
+    }
+    return res;
+  };
+
+  /**
    * Đăng xuất qua POST /v1/platform/auth/logout và xóa token
    */
   const logout = async () => {
@@ -99,6 +110,7 @@ export const useUserStore = defineStore("user", () => {
     mustChangePassword,
     isAuthenticated,
     fetchMe,
+    updateMe,
     refreshTokens,
     login,
     logout,

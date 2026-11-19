@@ -28,12 +28,20 @@
           </div>
         </div>
 
-        <AButton :loading="refreshingMe" @click="handleRefreshProfile">
-          <template #icon>
-            <Icon name="ant-design:reload-outlined" />
-          </template>
-          Đồng bộ thông tin
-        </AButton>
+        <ASpace wrap>
+          <AButton type="primary" @click="openEditProfile">
+            <template #icon>
+              <Icon name="ant-design:edit-outlined" />
+            </template>
+            Chỉnh sửa hồ sơ
+          </AButton>
+          <AButton :loading="refreshingMe" @click="handleRefreshProfile">
+            <template #icon>
+              <Icon name="ant-design:reload-outlined" />
+            </template>
+            Đồng bộ thông tin
+          </AButton>
+        </ASpace>
       </div>
     </ACard>
 
@@ -199,13 +207,37 @@
         </template>
       </div>
     </ACard>
+
+    <!-- Modal Chỉnh sửa hồ sơ & Avatar (PATCH /v1/platform/me) -->
+    <AModal
+      v-model:open="editOpen"
+      title="Chỉnh sửa hồ sơ cá nhân"
+      :confirm-loading="savingProfile"
+      ok-text="Lưu thay đổi"
+      cancel-text="Hủy"
+      @ok="submitEditProfile"
+    >
+      <AForm ref="editFormRef" :model="editForm" :rules="editRules" layout="vertical" class="mt-3">
+        <AFormItem label="Ảnh đại diện (Avatar)">
+          <ImageUploadField v-model="editForm.avatar_url" v-model:file="editAvatarFile" round />
+        </AFormItem>
+        <AFormItem label="Họ và tên" name="full_name">
+          <AInput v-model:value="editForm.full_name" placeholder="Nguyễn Văn A" />
+        </AFormItem>
+        <AFormItem label="Số điện thoại" name="phone">
+          <AInput v-model:value="editForm.phone" placeholder="0912345678" />
+        </AFormItem>
+      </AForm>
+    </AModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { h } from "vue";
 import { Tag, message } from "antdv-next";
-import type { DescriptionsItemType, TabsProps } from "antdv-next";
+import type { DescriptionsItemType, FormInstance, Rule, TabsProps } from "antdv-next";
+import ImageUploadField from "~/components/Base/ImageUploadField.vue";
+import { useMediaApi } from "~/composables/api/useMediaApi";
 import type { MFASetupOutput } from "~/types/api/auth";
 
 useHead({
@@ -214,7 +246,8 @@ useHead({
 
 const route = useRoute();
 const router = useRouter();
-const { user, roles, permissions, fetchMe } = useAuth();
+const { user, roles, permissions, fetchMe, updateMe } = useAuth();
+const mediaApi = useMediaApi();
 const { platformMeMfaSetup, platformMeMfaEnable, platformMeMfaDisable } = useApi();
 const { extractApiData, handleApiError } = useApiError();
 
@@ -288,6 +321,60 @@ const handleRefreshProfile = async () => {
     message.success("Đã cập nhật thông tin tài khoản!");
   } finally {
     refreshingMe.value = false;
+  }
+};
+
+// Chỉnh sửa hồ sơ cá nhân & Avatar (PATCH /v1/platform/me)
+const editOpen = ref(false);
+const savingProfile = ref(false);
+const editFormRef = ref<FormInstance>();
+const editAvatarFile = ref<File | null>(null);
+const editForm = reactive({
+  full_name: "",
+  phone: "",
+  avatar_url: "",
+});
+
+const editRules: Record<string, Rule[]> = {
+  full_name: [{ required: true, message: "Vui lòng nhập họ và tên", trigger: "blur" }],
+};
+
+const openEditProfile = () => {
+  editAvatarFile.value = null;
+  editForm.full_name = user.value?.full_name || "";
+  editForm.phone = user.value?.phone || "";
+  editForm.avatar_url = user.value?.avatar_url || "";
+  editOpen.value = true;
+};
+
+const submitEditProfile = async () => {
+  try {
+    await editFormRef.value?.validate();
+  } catch {
+    return;
+  }
+
+  savingProfile.value = true;
+  try {
+    const { ok } = await mediaApi.saveWithImageReplace({
+      file: editAvatarFile.value,
+      currentUrl: editForm.avatar_url,
+      previousUrl: user.value?.avatar_url,
+      folder: "avatars",
+      errorMessage: "Cập nhật hồ sơ thất bại!",
+      saveFn: (finalUrl) =>
+        updateMe({
+          full_name: editForm.full_name.trim(),
+          phone: editForm.phone.trim() || undefined,
+          avatar_url: finalUrl,
+        }),
+    });
+    if (!ok) return;
+
+    message.success("Đã cập nhật hồ sơ cá nhân!");
+    editOpen.value = false;
+  } finally {
+    savingProfile.value = false;
   }
 };
 

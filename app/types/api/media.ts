@@ -56,12 +56,16 @@ export interface MediaTrashParams {
   limit?: number;
 }
 
-/** Form data tải lên tệp POST /v1/platform/organizations/{org_id}/media/upload */
-export interface MediaUploadInput {
+/** Form data tải lên tệp cấp Platform POST /v1/platform/media/upload */
+export interface PlatformMediaUploadInput {
   /** Tệp ảnh (JPEG, PNG, WEBP, GIF) hoặc tài liệu (PDF, DOC, DOCX, XLS, XLSX; tối đa 25 MB) */
   file: File;
-  /** Thư mục con (VD: logos, avatars, students, documents) */
+  /** Thư mục con (VD: avatars, branding, docs; mặc định: general) */
   folder?: string;
+}
+
+/** Form data tải lên tệp của Tổ chức POST /v1/platform/organizations/{org_id}/media/upload */
+export interface MediaUploadInput extends PlatformMediaUploadInput {
   /** School ID (nếu tách theo trường) */
   school_id?: string;
 }

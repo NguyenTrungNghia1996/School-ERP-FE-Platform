@@ -7,6 +7,9 @@
           <AButton @click="navigateTo('/organizations')">
             <template #icon><Icon name="ant-design:arrow-left-outlined" /></template>
           </AButton>
+          <AAvatar :size="48" shape="square" :src="org?.logo_url || undefined" class="shrink-0 bg-slate-100 text-slate-500">
+            <template #icon><Icon name="ant-design:bank-outlined" /></template>
+          </AAvatar>
           <div>
             <div class="flex flex-wrap items-center gap-2">
               <ATypographyTitle :level="4" style="margin: 0">
@@ -24,6 +27,11 @@
         </div>
 
         <ASpace wrap>
+          <AButton @click="openEditOrgModal">
+            <template #icon><Icon name="ant-design:edit-outlined" /></template>
+            Chỉnh sửa thông tin
+          </AButton>
+
           <AButton :loading="loading" @click="loadAll">
             <template #icon><Icon name="ant-design:reload-outlined" /></template>
             Làm mới
@@ -292,14 +300,60 @@
         </AFormItem>
       </AForm>
     </AModal>
+
+    <!-- Modal Chỉnh sửa thông tin & Logo Tổ chức (PATCH /v1/platform/organizations/{id}) -->
+    <AModal
+      v-model:open="editOrgModalOpen"
+      title="Chỉnh sửa thông tin Tổ chức"
+      :confirm-loading="actionLoading"
+      ok-text="Lưu thay đổi"
+      cancel-text="Hủy"
+      width="620px"
+      @ok="submitEditOrg"
+    >
+      <AForm ref="editOrgFormRef" :model="editOrgForm" :rules="editOrgRules" layout="vertical" class="mt-3">
+        <AFormItem label="Logo Tổ chức">
+          <ImageUploadField v-model="editOrgForm.logo_url" v-model:file="editOrgLogoFile" />
+        </AFormItem>
+        <ARow :gutter="12">
+          <ACol :xs="24" :sm="14">
+            <AFormItem label="Tên Tổ chức" name="name">
+              <AInput v-model:value="editOrgForm.name" placeholder="Hệ thống Trường THPT Chu Văn An" />
+            </AFormItem>
+          </ACol>
+          <ACol :xs="24" :sm="10">
+            <AFormItem label="Mã số thuế" name="tax_code">
+              <AInput v-model:value="editOrgForm.tax_code" placeholder="0101234567" />
+            </AFormItem>
+          </ACol>
+        </ARow>
+        <ARow :gutter="12">
+          <ACol :xs="24" :sm="12">
+            <AFormItem label="Email liên hệ" name="contact_email">
+              <AInput v-model:value="editOrgForm.contact_email" placeholder="contact@chuvanan.edu.vn" />
+            </AFormItem>
+          </ACol>
+          <ACol :xs="24" :sm="12">
+            <AFormItem label="Số điện thoại liên hệ" name="contact_phone">
+              <AInput v-model:value="editOrgForm.contact_phone" placeholder="02438889999" />
+            </AFormItem>
+          </ACol>
+        </ARow>
+        <AFormItem label="Địa chỉ" name="address">
+          <AInput v-model:value="editOrgForm.address" placeholder="Số 10 Thụy Khuê, Tây Hồ, Hà Nội" />
+        </AFormItem>
+      </AForm>
+    </AModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { message } from "antdv-next";
-import type { DescriptionsItemType, TableProps, TabsProps } from "antdv-next";
+import type { DescriptionsItemType, FormInstance, Rule, TableProps, TabsProps } from "antdv-next";
+import ImageUploadField from "~/components/Base/ImageUploadField.vue";
 import OrgMediaTab from "~/components/Organizations/OrgMediaTab.vue";
 import { useBillingApi } from "~/composables/api/useBillingApi";
+import { useMediaApi } from "~/composables/api/useMediaApi";
 import { useTenantApi } from "~/composables/api/useTenantApi";
 import type {
   OrganizationEntitlement,
@@ -322,6 +376,7 @@ const orgId = computed(() => String(route.params.id || ""));
 const { platformPackages } = useApi();
 const tenantApi = useTenantApi();
 const billingApi = useBillingApi();
+const mediaApi = useMediaApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const activeTab = ref<"overview" | "subscriptions" | "entitlements" | "media">("overview");
@@ -563,6 +618,68 @@ const submitStatus = async () => {
 
 const subdomainModalOpen = ref(false);
 const subdomainForm = reactive({ new_subdomain: "", reason: "" });
+
+const editOrgModalOpen = ref(false);
+const editOrgFormRef = ref<FormInstance>();
+const editOrgLogoFile = ref<File | null>(null);
+const editOrgForm = reactive({
+  name: "",
+  logo_url: "",
+  contact_email: "",
+  contact_phone: "",
+  tax_code: "",
+  address: "",
+});
+const editOrgRules: Record<string, Rule[]> = {
+  name: [{ required: true, message: "Vui lòng nhập tên Tổ chức", trigger: "blur" }],
+};
+
+const openEditOrgModal = () => {
+  editOrgLogoFile.value = null;
+  editOrgForm.name = org.value?.name || "";
+  editOrgForm.logo_url = org.value?.logo_url || "";
+  editOrgForm.contact_email = org.value?.contact_email || "";
+  editOrgForm.contact_phone = org.value?.contact_phone || "";
+  editOrgForm.tax_code = org.value?.tax_code || "";
+  editOrgForm.address = org.value?.address || "";
+  editOrgModalOpen.value = true;
+};
+
+const submitEditOrg = async () => {
+  try {
+    await editOrgFormRef.value?.validate();
+  } catch {
+    return;
+  }
+
+  actionLoading.value = true;
+  try {
+    const { ok } = await mediaApi.saveWithImageReplace({
+      file: editOrgLogoFile.value,
+      currentUrl: editOrgForm.logo_url,
+      previousUrl: org.value?.logo_url,
+      orgId: orgId.value,
+      folder: "logos",
+      errorMessage: "Cập nhật thông tin Tổ chức thất bại!",
+      saveFn: (finalUrl) =>
+        tenantApi.updateOrganization(orgId.value, {
+          name: editOrgForm.name.trim(),
+          logo_url: finalUrl,
+          contact_email: editOrgForm.contact_email.trim() || undefined,
+          contact_phone: editOrgForm.contact_phone.trim() || undefined,
+          tax_code: editOrgForm.tax_code.trim() || undefined,
+          address: editOrgForm.address.trim() || undefined,
+        }),
+    });
+    if (!ok) return;
+
+    message.success("Đã cập nhật thông tin Tổ chức!");
+    editOrgModalOpen.value = false;
+    await loadOrg();
+  } finally {
+    actionLoading.value = false;
+  }
+};
 
 const openSubdomainModal = () => {
   subdomainForm.new_subdomain = org.value?.subdomain || "";

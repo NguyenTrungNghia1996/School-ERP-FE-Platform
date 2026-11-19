@@ -76,13 +76,20 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'name'">
-              <div
-                class="cursor-pointer font-semibold text-blue-600 hover:underline"
-                @click="navigateTo(`/organizations/${record.id}`)"
-              >
-                {{ record.name || "—" }}
+              <div class="flex items-center gap-2.5">
+                <AAvatar :size="36" shape="square" :src="record.logo_url || undefined" class="shrink-0 bg-slate-100 text-slate-500">
+                  <template #icon><Icon name="ant-design:bank-outlined" /></template>
+                </AAvatar>
+                <div class="min-w-0">
+                  <div
+                    class="cursor-pointer truncate font-semibold text-blue-600 hover:underline"
+                    @click="navigateTo(`/organizations/${record.id}`)"
+                  >
+                    {{ record.name || "—" }}
+                  </div>
+                  <div class="font-mono text-xs text-slate-500">{{ record.code }}</div>
+                </div>
               </div>
-              <div class="font-mono text-xs text-slate-500">{{ record.code }}</div>
             </template>
 
             <template v-else-if="column.key === 'subdomain'">
@@ -154,6 +161,9 @@
         <ADivider title-placement="left" class="!my-2 text-xs text-slate-500">
           1. Thông tin Tổ chức
         </ADivider>
+        <AFormItem label="Logo Tổ chức" name="logo_url">
+          <ImageUploadField v-model="createForm.logo_url" v-model:file="orgLogoFile" />
+        </AFormItem>
         <ARow :gutter="12">
           <ACol :xs="24" :sm="12">
             <AFormItem label="Tên Tổ chức" name="name">
@@ -215,6 +225,9 @@
         <ADivider title-placement="left" class="!my-2 text-xs text-slate-500">
           2. Trường học đầu tiên
         </ADivider>
+        <AFormItem label="Logo Trường" :name="['school', 'logo_url']">
+          <ImageUploadField v-model="createForm.school.logo_url" v-model:file="schoolLogoFile" />
+        </AFormItem>
         <ARow :gutter="12">
           <ACol :xs="24" :sm="10">
             <AFormItem label="Tên trường" :name="['school', 'name']">
@@ -261,6 +274,8 @@
 <script setup lang="ts">
 import { message } from "antdv-next";
 import type { FormInstance, Rule, TableProps } from "antdv-next";
+import ImageUploadField from "~/components/Base/ImageUploadField.vue";
+import { useMediaApi } from "~/composables/api/useMediaApi";
 import { useTenantApi } from "~/composables/api/useTenantApi";
 import type { OrganizationSummary } from "~/types/api/tenant";
 
@@ -274,6 +289,7 @@ useHead({
 
 const { platformOrganizations, platformOrganizationsCheckSubdomain } = useApi();
 const tenantApi = useTenantApi();
+const mediaApi = useMediaApi();
 const { extractApiData, handleApiError } = useApiError();
 
 const searchInput = ref("");
@@ -412,9 +428,13 @@ const formRef = ref<FormInstance>();
 const checkingSubdomain = ref(false);
 const subdomainChecked = ref<{ available: boolean; message: string } | null>(null);
 
+const orgLogoFile = ref<File | null>(null);
+const schoolLogoFile = ref<File | null>(null);
+
 const createForm = reactive({
   name: "",
   code: "",
+  logo_url: "",
   subdomain: "",
   tax_code: "",
   contact_email: "",
@@ -423,6 +443,7 @@ const createForm = reactive({
   school: {
     name: "",
     code: "",
+    logo_url: "",
     level: "K12",
     email: "",
     phone: "",
@@ -455,14 +476,17 @@ const formRules: Record<string, Rule[]> = {
 
 const openCreateModal = () => {
   subdomainChecked.value = null;
+  orgLogoFile.value = null;
+  schoolLogoFile.value = null;
   createForm.name = "";
   createForm.code = "";
+  createForm.logo_url = "";
   createForm.subdomain = "";
   createForm.tax_code = "";
   createForm.contact_email = "";
   createForm.contact_phone = "";
   createForm.address = "";
-  createForm.school = { name: "", code: "", level: "K12", email: "", phone: "", address: "" };
+  createForm.school = { name: "", code: "", logo_url: "", level: "K12", email: "", phone: "", address: "" };
   createForm.admin = { full_name: "", email: "", phone: "", password: "" };
   createOpen.value = true;
 };
@@ -502,10 +526,37 @@ const submitCreate = async () => {
   }
 
   submitting.value = true;
+  const uploadedUrls: string[] = [];
+  const cleanupUploaded = async () => {
+    for (const url of uploadedUrls) {
+      await mediaApi.deletePlatformMediaByUrl(url).catch(() => {});
+    }
+  };
+
   try {
+    let orgLogoUrl = createForm.logo_url.trim();
+    if (orgLogoFile.value) {
+      const up = await mediaApi.uploadAndGetUrl({ file: orgLogoFile.value, folder: "logos" });
+      if (handleApiError(up.data, up.error, "Tải logo Tổ chức thất bại!")) return;
+      orgLogoUrl = up.accessUrl;
+      if (orgLogoUrl) uploadedUrls.push(orgLogoUrl);
+    }
+
+    let schoolLogoUrl = createForm.school.logo_url.trim();
+    if (schoolLogoFile.value) {
+      const up = await mediaApi.uploadAndGetUrl({ file: schoolLogoFile.value, folder: "logos" });
+      if (handleApiError(up.data, up.error, "Tải logo Trường thất bại!")) {
+        await cleanupUploaded();
+        return;
+      }
+      schoolLogoUrl = up.accessUrl;
+      if (schoolLogoUrl) uploadedUrls.push(schoolLogoUrl);
+    }
+
     const payload = {
       name: createForm.name.trim(),
       code: createForm.code.trim(),
+      ...(orgLogoUrl ? { logo_url: orgLogoUrl } : {}),
       subdomain: createForm.subdomain.trim().toLowerCase(),
       tax_code: createForm.tax_code.trim() || undefined,
       contact_email: createForm.contact_email.trim() || undefined,
@@ -514,6 +565,7 @@ const submitCreate = async () => {
       school: {
         name: createForm.school.name.trim(),
         code: createForm.school.code.trim(),
+        ...(schoolLogoUrl ? { logo_url: schoolLogoUrl } : {}),
         level: createForm.school.level,
       },
       admin: {
@@ -524,7 +576,10 @@ const submitCreate = async () => {
     };
 
     const { data, error } = await platformOrganizations.post(payload);
-    if (handleApiError(data, error, "Khởi tạo Tổ chức thất bại!")) return;
+    if (handleApiError(data, error, "Khởi tạo Tổ chức thất bại!")) {
+      await cleanupUploaded();
+      return;
+    }
 
     message.success((unref(data) as { message?: string } | null)?.message || "Đã tạo Tổ chức thành công!");
     createOpen.value = false;

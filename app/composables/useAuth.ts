@@ -12,6 +12,7 @@ export const useAuth = () => {
     menus,
     isAuthenticated,
     fetchMe: userStore.fetchMe,
+    updateMe: userStore.updateMe,
     login: userStore.login,
     logout: userStore.logout,
   };

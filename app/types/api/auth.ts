@@ -63,6 +63,13 @@ export interface LoginOutput {
   token_type: string;
 }
 
+/** Request body của PATCH /v1/platform/me (auth.UpdateMeInput) */
+export interface UpdateMeInput {
+  full_name?: string;
+  phone?: string;
+  avatar_url?: string;
+}
+
 /** Response data của POST /v1/platform/me/mfa/setup (auth.MFASetupOutput) */
 export interface MFASetupOutput {
   account?: string;

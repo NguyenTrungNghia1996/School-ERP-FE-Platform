@@ -3,6 +3,7 @@ export interface Organization {
   id?: string;
   code?: string;
   name?: string;
+  logo_url?: string;
   subdomain?: string;
   tax_code?: string;
   address?: string;
@@ -64,6 +65,7 @@ export interface OrganizationFilterParams {
 export interface CreateOrganizationInput {
   code?: string;
   name?: string;
+  logo_url?: string;
   subdomain?: string;
   tax_code?: string;
   address?: string;
@@ -72,6 +74,7 @@ export interface CreateOrganizationInput {
   school?: {
     code?: string;
     name?: string;
+    logo_url?: string;
     level?: string;
     email?: string;
     phone?: string;
@@ -83,4 +86,14 @@ export interface CreateOrganizationInput {
     phone?: string;
     password?: string;
   };
+}
+
+/** Input cập nhật thông tin Tổ chức PATCH /v1/platform/organizations/{id} (tenant_mgmt.UpdateOrganizationInput) */
+export interface UpdateOrganizationInput {
+  name?: string;
+  logo_url?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  tax_code?: string;
+  address?: string;
 }
