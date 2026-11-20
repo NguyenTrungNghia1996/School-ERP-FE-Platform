@@ -15,9 +15,7 @@
             Đã dùng
             <span class="font-semibold text-slate-700">{{ formatBytes(usage?.used_bytes) }}</span>
             / {{ formatBytes(usage?.quota_bytes) }}
-            <span v-if="usage?.remaining_bytes !== undefined">
-              (còn lại {{ formatBytes(usage.remaining_bytes) }})
-            </span>
+            <span v-if="usage?.remaining_bytes !== undefined">(còn lại {{ formatBytes(usage.remaining_bytes) }})</span>
             • {{ usage?.file_count ?? 0 }} tệp
           </div>
         </div>
@@ -28,11 +26,7 @@
             <span class="font-semibold">{{ (usage?.usage_percent ?? 0).toFixed(1) }}%</span>
           </div>
           <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-            <div
-              class="h-full rounded-full transition-all"
-              :class="(usage?.usage_percent ?? 0) >= 90 ? 'bg-red-500' : 'bg-blue-600'"
-              :style="{ width: `${Math.min(100, Math.max(0, usage?.usage_percent ?? 0))}%` }"
-            />
+            <div class="h-full rounded-full transition-all" :class="(usage?.usage_percent ?? 0) >= 90 ? 'bg-red-500' : 'bg-blue-600'" :style="{ width: `${Math.min(100, Math.max(0, usage?.usage_percent ?? 0))}%` }" />
           </div>
         </div>
       </AFlex>
@@ -46,15 +40,7 @@
           <ARadioButton value="trash">Thùng rác</ARadioButton>
         </ARadioGroup>
 
-        <AInput
-          v-if="viewMode === 'active'"
-          v-model:value="folderFilter"
-          placeholder="Lọc theo thư mục (VD: logos, avatars)"
-          allow-clear
-          class="w-64"
-          @press-enter="handleFolderFilter"
-          @change="() => !folderFilter && handleFolderFilter()"
-        >
+        <AInput v-if="viewMode === 'active'" v-model:value="folderFilter" placeholder="Lọc theo thư mục (VD: logos, avatars)" allow-clear class="w-64" @press-enter="handleFolderFilter" @change="() => !folderFilter && handleFolderFilter()">
           <template #prefix><Icon name="ant-design:folder-outlined" class="text-slate-400" /></template>
         </AInput>
       </ASpace>
@@ -87,18 +73,12 @@
         row-key="id"
         size="small"
         :scroll="{ x: 900 }"
-        @change="handleTableChange"
-      >
+        @change="handleTableChange">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'file'">
             <div class="flex items-center gap-3">
               <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-100">
-                <img
-                  v-if="isImageMime(record.mime_type) && (record.access_url || record.public_url)"
-                  :src="record.access_url || record.public_url"
-                  :alt="record.original_name || 'preview'"
-                  class="h-full w-full object-cover"
-                />
+                <img v-if="isImageMime(record.mime_type) && (record.access_url || record.public_url)" :src="record.access_url || record.public_url" :alt="record.original_name || 'preview'" class="h-full w-full object-cover" />
                 <Icon v-else name="ant-design:file-outlined" class="text-lg text-slate-400" />
               </div>
               <div class="min-w-0">
@@ -115,20 +95,10 @@
 
           <template v-else-if="column.key === 'access_url'">
             <div v-if="record.access_url || record.public_url" class="flex items-center gap-1.5">
-              <a
-                :href="record.access_url || record.public_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="max-w-xs truncate font-mono text-xs text-blue-600 hover:underline"
-              >
+              <a :href="record.access_url || record.public_url" target="_blank" rel="noopener noreferrer" class="max-w-xs truncate font-mono text-xs text-blue-600 hover:underline">
                 {{ record.access_url || record.public_url }}
               </a>
-              <AButton
-                size="small"
-                type="text"
-                title="Sao chép access_url"
-                @click="copyUrl(record.access_url || record.public_url)"
-              >
+              <AButton size="small" type="text" title="Sao chép access_url" @click="copyUrl(record.access_url || record.public_url)">
                 <template #icon><Icon name="ant-design:copy-outlined" /></template>
               </AButton>
             </div>
@@ -147,30 +117,15 @@
 
           <template v-else-if="column.key === 'actions'">
             <ASpace v-if="viewMode === 'active'" size="small">
-              <AButton size="small" :loading="rowActionId === record.id" @click="handleFetchAccessUrl(record)">
-                Lấy URL
-              </AButton>
-              <APopconfirm
-                v-if="record.access_url"
-                title="Chuyển tệp này vào thùng rác?"
-                ok-text="Xóa"
-                cancel-text="Hủy"
-                @confirm="handleSoftDelete(record)"
-              >
+              <AButton size="small" :loading="rowActionId === record.id" @click="handleFetchAccessUrl(record)">Lấy URL</AButton>
+              <APopconfirm v-if="record.access_url" title="Chuyển tệp này vào thùng rác?" ok-text="Xóa" cancel-text="Hủy" @confirm="handleSoftDelete(record)">
                 <AButton size="small" danger :loading="rowActionId === record.id">Xóa</AButton>
               </APopconfirm>
             </ASpace>
 
             <ASpace v-else size="small">
-              <AButton size="small" type="primary" ghost :loading="rowActionId === record.id" @click="handleRestore(record)">
-                Khôi phục
-              </AButton>
-              <APopconfirm
-                title="Xóa vĩnh viễn tệp này khỏi R2/S3? Không thể hoàn tác!"
-                ok-text="Xóa vĩnh viễn"
-                cancel-text="Hủy"
-                @confirm="handlePermanentDelete(record)"
-              >
+              <AButton size="small" type="primary" ghost :loading="rowActionId === record.id" @click="handleRestore(record)">Khôi phục</AButton>
+              <APopconfirm title="Xóa vĩnh viễn tệp này khỏi R2/S3? Không thể hoàn tác!" ok-text="Xóa vĩnh viễn" cancel-text="Hủy" @confirm="handlePermanentDelete(record)">
                 <AButton size="small" danger :loading="rowActionId === record.id">Xóa hẳn</AButton>
               </APopconfirm>
             </ASpace>
@@ -180,40 +135,24 @@
     </ClientOnly>
 
     <!-- Modal Upload tệp (POST /v1/platform/organizations/{org_id}/media/upload) -->
-    <AModal
-      v-model:open="uploadModalOpen"
-      title="Tải tệp lên Media của Tổ chức"
-      :confirm-loading="uploading"
-      ok-text="Tải lên"
-      cancel-text="Đóng"
-      @ok="submitUpload"
-    >
+    <AModal v-model:open="uploadModalOpen" title="Tải tệp lên Media của Tổ chức" :confirm-loading="uploading" ok-text="Tải lên" cancel-text="Đóng" @ok="submitUpload">
       <AForm layout="vertical" class="mt-3">
         <AFormItem label="Chọn tệp (tối đa 25 MB)" required>
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx"
-            class="block w-full cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-            @change="onFileSelected"
-          />
-          <div class="mt-1 text-[11px] text-slate-500">
-            Hỗ trợ ảnh (JPEG, PNG, WEBP, GIF) hoặc tài liệu (PDF, DOC, DOCX, XLS, XLSX).
-          </div>
-          <div v-if="uploadForm.file" class="mt-1.5 text-xs font-medium text-emerald-700">
-            Đã chọn: {{ uploadForm.file.name }} ({{ formatBytes(uploadForm.file.size) }})
-          </div>
+          <ClientOnly>
+            <AUploadDragger :file-list="uploadFileList" :max-count="1" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx" :before-upload="handleBeforeUpload" @remove="handleRemoveUploadFile">
+              <p class="mb-2 text-2xl text-blue-600">
+                <Icon name="ant-design:cloud-upload-outlined" />
+              </p>
+              <p class="text-sm font-medium text-slate-700">Nhấp hoặc kéo thả tệp vào khu vực này</p>
+              <p class="mt-1 text-[11px] text-slate-500">Hỗ trợ ảnh (JPEG, PNG, WEBP, GIF) hoặc tài liệu (PDF, DOC, DOCX, XLS, XLSX), tối đa 25 MB.</p>
+            </AUploadDragger>
+          </ClientOnly>
         </AFormItem>
 
         <AFormItem label="Thư mục con (folder)">
           <AInput v-model:value="uploadForm.folder" placeholder="logos, avatars, students, documents" />
           <div class="mt-1.5 flex flex-wrap gap-1.5">
-            <ATag
-              v-for="preset in folderPresets"
-              :key="preset"
-              class="cursor-pointer !text-[11px]"
-              @click="uploadForm.folder = preset"
-            >
+            <ATag v-for="preset in folderPresets" :key="preset" class="cursor-pointer !text-[11px]" @click="uploadForm.folder = preset">
               {{ preset }}
             </ATag>
           </div>
@@ -245,23 +184,13 @@
         <div>
           <div class="mb-1 font-medium text-slate-600">
             Access URL
-            <span v-if="selectedFileUrl.expires_in_seconds" class="text-slate-400">
-              (hết hạn sau {{ selectedFileUrl.expires_in_seconds }}s)
-            </span>
+            <span v-if="selectedFileUrl.expires_in_seconds" class="text-slate-400">(hết hạn sau {{ selectedFileUrl.expires_in_seconds }}s)</span>
           </div>
           <div class="flex items-center gap-2 rounded bg-slate-100 px-2.5 py-1.5">
-            <a
-              v-if="selectedFileUrl.url"
-              :href="selectedFileUrl.url"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="min-w-0 flex-1 truncate font-mono text-blue-600 hover:underline"
-            >
+            <a v-if="selectedFileUrl.url" :href="selectedFileUrl.url" target="_blank" rel="noopener noreferrer" class="min-w-0 flex-1 truncate font-mono text-blue-600 hover:underline">
               {{ selectedFileUrl.url }}
             </a>
-            <AButton v-if="selectedFileUrl.url" size="small" @click="copyUrl(selectedFileUrl.url)">
-              Sao chép
-            </AButton>
+            <AButton v-if="selectedFileUrl.url" size="small" @click="copyUrl(selectedFileUrl.url)">Sao chép</AButton>
           </div>
         </div>
       </div>
@@ -271,7 +200,7 @@
 
 <script setup lang="ts">
 import { message } from "antdv-next";
-import type { TableProps } from "antdv-next";
+import type { TableProps, UploadFile, UploadProps } from "antdv-next";
 import { useMediaApi } from "~/composables/api/useMediaApi";
 import type { MediaFileURLOutput, StorageUsageOutput, StoredFile } from "~/types/api/media";
 
@@ -298,7 +227,7 @@ const files = ref<StoredFile[]>([]);
 const pagination = reactive({ page: 1, limit: 20, total: 0 });
 
 const uploadModalOpen = ref(false);
-const fileInputRef = ref<HTMLInputElement | null>(null);
+const uploadFileList = ref<UploadFile[]>([]);
 const lastUploadedUrl = ref("");
 const uploadForm = reactive<{
   file: File | null;
@@ -391,24 +320,32 @@ const openUploadModal = () => {
   uploadForm.folder = folderFilter.value.trim();
   uploadForm.school_id = "";
   lastUploadedUrl.value = "";
-  if (fileInputRef.value) fileInputRef.value.value = "";
+  uploadFileList.value = [];
   uploadModalOpen.value = true;
 };
 
-const onFileSelected = (event: Event) => {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0] || null;
-  if (!file) {
-    uploadForm.file = null;
-    return;
-  }
-  if (file.size > MAX_FILE_SIZE_BYTES) {
+const handleBeforeUpload: UploadProps["beforeUpload"] = (picked) => {
+  if ((picked.size || 0) > MAX_FILE_SIZE_BYTES) {
     message.error("Kích thước tệp vượt quá giới hạn tối đa 25 MB!");
-    input.value = "";
-    uploadForm.file = null;
-    return;
+    return false;
   }
-  uploadForm.file = file;
+  uploadForm.file = picked;
+  uploadFileList.value = [
+    {
+      uid: picked.uid || String(Date.now()),
+      name: picked.name,
+      status: "done",
+      size: picked.size,
+      type: picked.type,
+    },
+  ];
+  return false;
+};
+
+const handleRemoveUploadFile = () => {
+  uploadForm.file = null;
+  uploadFileList.value = [];
+  return true;
 };
 
 const submitUpload = async () => {
@@ -432,7 +369,7 @@ const submitUpload = async () => {
     lastUploadedUrl.value = accessUrl;
     message.success("Tải tệp lên thành công!");
     uploadForm.file = null;
-    if (fileInputRef.value) fileInputRef.value.value = "";
+    uploadFileList.value = [];
     await loadAll();
   } finally {
     uploading.value = false;

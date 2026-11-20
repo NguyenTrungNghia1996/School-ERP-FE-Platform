@@ -54,11 +54,35 @@
             </AInputPassword>
           </AFormItem>
 
-          <div class="mb-5 flex items-center justify-between">
+          <div class="mb-4 flex items-center justify-between">
             <ACheckbox v-model:checked="rememberMe">
               <span class="text-xs text-slate-600">Lưu thông tin đăng nhập</span>
             </ACheckbox>
+            <button
+              type="button"
+              class="cursor-pointer border-0 bg-transparent p-0 text-xs font-medium text-blue-600 hover:underline"
+              @click="showOtpField = !showOtpField"
+            >
+              {{ showOtpField ? "Ẩn mã OTP" : "Nhập mã OTP (MFA)" }}
+            </button>
           </div>
+
+          <AFormItem
+            v-if="showOtpField"
+            label="Mã xác thực OTP 6 chữ số (TOTP)"
+            name="otp_code"
+            :rules="[{ len: 6, message: 'Mã OTP gồm đúng 6 chữ số' }]"
+          >
+            <ClientOnly>
+              <AInputOtp
+                v-model:value="formState.otp_code"
+                :length="6"
+                size="large"
+                input-mode="numeric"
+                :formatter="onlyDigits"
+              />
+            </ClientOnly>
+          </AFormItem>
 
           <AFormItem class="!mb-2">
             <AButton
@@ -99,10 +123,13 @@ const rememberedEmailCookie = useCookie<string | null>("remember_email", {
 const formRef = ref<FormInstance>();
 const submitting = ref(false);
 const rememberMe = ref(Boolean(rememberedEmailCookie.value));
+const showOtpField = ref(false);
+const onlyDigits = (val: string) => val.replace(/\D/g, "");
 
 const formState = reactive<LoginInput>({
   email: rememberedEmailCookie.value || "",
   password: "",
+  otp_code: "",
 });
 
 const formRules: Record<string, Rule[]> = {
@@ -121,6 +148,7 @@ const handleSubmit = async () => {
       {
         email,
         password: formState.password,
+        ...(formState.otp_code?.trim() ? { otp_code: formState.otp_code.trim() } : {}),
       },
       rememberMe.value,
     );

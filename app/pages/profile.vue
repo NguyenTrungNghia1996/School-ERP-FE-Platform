@@ -133,7 +133,9 @@
                   { len: 6, message: 'Mã OTP gồm đúng 6 chữ số' },
                 ]">
                 <div class="flex flex-wrap items-center gap-3">
-                  <AInput v-model:value="mfaForm.otp_code" :maxlength="6" placeholder="123456" class="!w-48 font-mono tracking-widest" size="large" />
+                  <ClientOnly>
+                    <AInputOtp v-model:value="mfaForm.otp_code" :length="6" size="large" input-mode="numeric" :formatter="onlyDigits" />
+                  </ClientOnly>
                   <AButton type="primary" html-type="submit" size="large" :loading="mfaLoading">Kích hoạt MFA</AButton>
                   <AButton size="large" @click="mfaSetup = null">Hủy</AButton>
                 </div>
@@ -158,7 +160,9 @@
                   { len: 6, message: 'Mã OTP gồm đúng 6 chữ số' },
                 ]">
                 <div class="flex flex-wrap items-center gap-3">
-                  <AInput v-model:value="mfaForm.otp_code" :maxlength="6" placeholder="123456" class="!w-48 font-mono tracking-widest" size="large" />
+                  <ClientOnly>
+                    <AInputOtp v-model:value="mfaForm.otp_code" :length="6" size="large" input-mode="numeric" :formatter="onlyDigits" />
+                  </ClientOnly>
                   <AButton danger type="primary" html-type="submit" size="large" :loading="mfaLoading">Xác nhận tắt MFA</AButton>
                 </div>
               </AFormItem>
@@ -332,6 +336,7 @@ const submitEditProfile = async () => {
 const mfaLoading = ref(false);
 const mfaSetup = ref<MFASetupOutput | null>(null);
 const mfaForm = reactive({ otp_code: "" });
+const onlyDigits = (val: string) => val.replace(/\D/g, "");
 
 const copySecret = async (secret?: string) => {
   if (!secret || !import.meta.client) return;
